@@ -1,0 +1,13 @@
+{
+	"editorPhrase": {
+		"Search:": "検索:",
+		"Replace:": "置換:",
+		"(Use /re/ syntax for regexp search)": "(/re/と書くと正規表現で検索できます)",
+		"With:": "置換する文字:",
+		"Replace?": "置換しますか？",
+		"Yes": "はい",
+		"No": "いいえ",
+		"All": "すべて",
+		"Stop": "やめる"
+	}
+}

@@ -1,0 +1,13 @@
+{
+	"editorPhrase": {
+		"Search:": "Search:",
+		"Replace:": "Replace:",
+		"(Use /re/ syntax for regexp search)": "(Use /re/ syntax for regexp search)",
+		"With:": "With:",
+		"Replace?": "Replace?",
+		"Yes": "Yes",
+		"No": "No",
+		"All": "All",
+		"Stop": "Stop"
+	}
+}

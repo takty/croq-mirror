@@ -1,11 +1,14 @@
 import { Editor } from './editor-view.js';
 import { CodeMirror, lintEn, lintJa } from './vendor.js';
-import { RESOURCES } from './defaults.js';
+import RESOURCES from './defaults.json';
 import { AnalysisClient } from './analysis-client.js';
+import english from './res/lang.en.json';
+import japanese from './res/lang.ja.json';
 
 // Default settings ------------------------------------------------------------
 
 const mounted = new WeakSet();
+const LANGUAGES = { en: english, ja: japanese };
 const DEFAULT_SETTINGS = {
 	language            : 'ja',
 	fontFamily          : 'CroqInconsolata, "Hiragino Sans", "BIZ UDGothic", "Yu Gothic Medium", Meiryo, monospace',
@@ -92,7 +95,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		client = new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
 		await client.ready;
 		const owner = {
-			_res: { ...RESOURCES, editorPhrase: settings.language === 'ja' ? RESOURCES.editorPhrase : {} },
+			_res: { ...RESOURCES, editorPhrase: { ...LANGUAGES[settings.language].editorPhrase } },
 			executeCommand(command) {
 				api.setSettings({ fontSize: Math.min(64, Math.max(10, settings.fontSize + (command === 'fontSizePlus' ? 2 : -2))) });
 			},
@@ -143,7 +146,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			root.inert = settings.disabled;
 			root.setAttribute('aria-disabled', String(settings.disabled));
 			if (settings.disabled) cm.getInputField().blur();
-			cm.setOption('phrases', settings.language === 'ja' ? RESOURCES.editorPhrase : {});
+			cm.setOption('phrases', { ...LANGUAGES[settings.language].editorPhrase });
 			view.functionLineNumberEnabled(settings.analysis && settings.functionLineNumbers);
 			setLint();
 			view.refresh(true);

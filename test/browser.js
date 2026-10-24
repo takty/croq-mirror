@@ -15,6 +15,17 @@ try {
 	const ja = a.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	const en = b.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');
+	a.execute('find');
+	const jaSearch = a.getCodeMirror().phrase('Search:');
+	assert(jaSearch !== 'Search:' && document.querySelector('#a .CodeMirror-dialog').textContent.includes(jaSearch), 'Japanese search uses language resources');
+	a.getCodeMirror().getWrapperElement().querySelector('.CodeMirror-dialog input').dispatchEvent(new KeyboardEvent('keydown', { keyCode: 27, bubbles: true }));
+	b.execute('find');
+	assert(document.querySelector('#b .CodeMirror-dialog').textContent.includes('Search:'), 'English search uses language resources');
+	b.getCodeMirror().getWrapperElement().querySelector('.CodeMirror-dialog input').dispatchEvent(new KeyboardEvent('keydown', { keyCode: 27, bubbles: true }));
+	a.setSettings({ language: 'en' });
+	assert(a.getCodeMirror().phrase('Search:') === 'Search:', 'language resources switch at runtime');
+	a.setSettings({ language: 'ja' });
+	assert(a.getCodeMirror().phrase('Search:') === jaSearch && b.getCodeMirror().phrase('Search:') === 'Search:', 'language resources remain independent');
 	a.setSettings({ lineWrapping: true, fontSize: 22 });
 	assert(!b.getCodeMirror().getOption('lineWrapping') && b.getSettings().fontSize === 16, 'settings isolated');
 	let origin;
