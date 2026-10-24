@@ -7,7 +7,7 @@
 
 @import "./variables.css";
 
-.CodeMirror {
+:where(.croq-mirror) .CodeMirror {
 	background-color: var(--croq-mirror-color-editor);
 	color           : var(--croq-mirror-color-text);
 
@@ -23,7 +23,7 @@
 	line-height: 165%;
 }
 
-.CodeMirror > div:first-child {
+:where(.croq-mirror) .CodeMirror > div:first-child {
 	overflow      : visible !important;
 	opacity       : 0;
 	pointer-events: none;
@@ -35,28 +35,28 @@
 	}
 }
 
-.CodeMirror-rulers {
+:where(.croq-mirror) .CodeMirror-rulers {
 	z-index       : 3;
 	pointer-events: none;
 }
 
-.CodeMirror-scrollbar-filler {
+:where(.croq-mirror) .CodeMirror-scrollbar-filler {
 	background-color: var(--croq-mirror-color-editor);
 }
 
-.CodeMirror pre {
+:where(.croq-mirror) .CodeMirror pre {
 	padding-left: 2px;
 }
 
-.CodeMirror-selected,
-.CodeMirror-focused .CodeMirror-selected,
-.CodeMirror-line::selection,
-.CodeMirror-line > span::selection,
-.CodeMirror-line > span > span::selection {
+:where(.croq-mirror) .CodeMirror-selected,
+:where(.croq-mirror) .CodeMirror-focused .CodeMirror-selected,
+:where(.croq-mirror) .CodeMirror-line::selection,
+:where(.croq-mirror) .CodeMirror-line > span::selection,
+:where(.croq-mirror) .CodeMirror-line > span > span::selection {
 	background-color: color-mix(in srgb, var(--croq-mirror-l-aqua-60) 50%, transparent);
 }
 
-.CodeMirror-selectedtext {
+:where(.croq-mirror) .CodeMirror-selectedtext {
 	text-shadow:
 		#fff -1px  1px 8px,
 		#fff  1px -1px 8px,
@@ -64,7 +64,7 @@
 		#fff -1px -1px 8px !important;
 }
 
-.cm-tab {
+:where(.croq-mirror) .cm-tab {
 	position: relative;
 	&::before,
 	&::after {
@@ -93,23 +93,23 @@
 	}
 }
 
-.CodeMirror-wrap pre {
+:where(.croq-mirror) .CodeMirror-wrap pre {
 	word-break: break-all;
 }
 
-.CodeMirror.wordwrap pre > * { text-indent: 0; }
+:where(.croq-mirror) .CodeMirror.wordwrap pre > * { text-indent: 0; }
 
 /* Gutter ---------------------------------------------------------------------- */
 
-.CodeMirror-gutter-background {
+:where(.croq-mirror) .CodeMirror-gutter-background {
 	z-index: 0;
 }
 
-.CodeMirror-gutter-wrapper {
+:where(.croq-mirror) .CodeMirror-gutter-wrapper {
 	height: 100%;
 }
 
-.CodeMirror-gutters {  /* includes right border */
+:where(.croq-mirror) .CodeMirror-gutters {  /* includes right border */
 	background-color: var(--croq-mirror-color-window);
 	border-right    : 16px solid transparent;
 	border-left     : 0;
@@ -142,15 +142,15 @@
 	}
 }
 
-.CodeMirror-gutter {
+:where(.croq-mirror) .CodeMirror-gutter {
 	padding-left: 4px;
 }
 
-.CodeMirror-gutter-elt {
+:where(.croq-mirror) .CodeMirror-gutter-elt {
 	height: 100%;
 }
 
-.CodeMirror:not(.line-selection-mode) {
+:where(.croq-mirror) .CodeMirror:not(.line-selection-mode) {
 	.CodeMirror-gutter,
 	.CodeMirror-gutter-elt,
 	.CodeMirror-linenumber,
@@ -159,7 +159,7 @@
 	}
 }
 
-.CodeMirror.line-selection-mode {
+:where(.croq-mirror) .CodeMirror.line-selection-mode {
 	.CodeMirror-gutter,
 	.CodeMirror-gutter-elt,
 	.CodeMirror-linenumber,
@@ -168,20 +168,20 @@
 	}
 }
 
-.CodeMirror-lint-markers {
+:where(.croq-mirror) .CodeMirror-lint-markers {
 	border-left: 4px solid var(--croq-mirror-color-window);
 }
 
-.CodeMirror-activeline-gutter .CodeMirror-linenumber {
+:where(.croq-mirror) .CodeMirror-activeline-gutter .CodeMirror-linenumber {
 	font-weight: bold;
 	color: var(--croq-mirror-color-text);
 }
 
-:not(.CodeMirror-activeline-gutter) > .CodeMirror-linenumber {
+:where(.croq-mirror) :not(.CodeMirror-activeline-gutter) > .CodeMirror-linenumber {
 	color: var(--croq-mirror-l-darkgray);
 }
 
-.CodeMirror-linenumber {
+:where(.croq-mirror) .CodeMirror-linenumber {
 	pointer-events: none;
 	&::before {
 		content: '';
@@ -200,24 +200,24 @@
 
 /* Function Number Gutter ------------------------------------------------------ */
 
-.CodeMirror-function-linenumber,
-.CodeMirror-function-number {
+:where(.croq-mirror) .CodeMirror-function-linenumber,
+:where(.croq-mirror) .CodeMirror-function-number {
 	padding: 0 7px 0 1px;
 	min-width: 20px;
 	white-space: nowrap;
 }
 
-.CodeMirror-function-linenumber {
+:where(.croq-mirror) .CodeMirror-function-linenumber {
 	text-align: right;
 	color: var(--croq-mirror-l-darkgray);
 }
 
-.CodeMirror-function-number {
+:where(.croq-mirror) .CodeMirror-function-number {
 	text-align: left;
 	color: var(--croq-mirror-l-brown);
 }
 
-.CodeMirror-activeline-gutter {
+:where(.croq-mirror) .CodeMirror-activeline-gutter {
 	.CodeMirror-function-linenumber,
 	.CodeMirror-function-number {
 		font-weight: bold;
@@ -225,11 +225,11 @@
 	}
 }
 
-.CodeMirror-function-odd {
+:where(.croq-mirror) .CodeMirror-function-odd {
 	height: 100%;
 }
 
-.CodeMirror-function-even {
+:where(.croq-mirror) .CodeMirror-function-even {
 	&::after {
 		content: '';
 		position: absolute;
@@ -244,8 +244,8 @@
 	height: 100%;
 }
 
-.CodeMirror-function-linenumber,
-.CodeMirror-function-number {
+:where(.croq-mirror) .CodeMirror-function-linenumber,
+:where(.croq-mirror) .CodeMirror-function-number {
 	pointer-events: none;
 	&::before {
 		content: '';
@@ -267,7 +267,7 @@
 	}
 }
 
-.cm-annotate-scrollbar-function-marker {
+:where(.croq-mirror) .cm-annotate-scrollbar-function-marker {
 	&::after {
 		content : '';
 		position: absolute;
@@ -284,7 +284,7 @@
 
 /* Cursor ---------------------------------------------------------------------- */
 
-.CodeMirror-cursor {
+:where(.croq-mirror) .CodeMirror-cursor {
 	border-left:   2px solid color-mix(in srgb, var(--croq-mirror-l-brown) 60%, transparent);
 	border-bottom: 2px solid color-mix(in srgb, var(--croq-mirror-l-brown) 35%, transparent);
 	border-radius: 0 0 0 2px;
@@ -292,14 +292,14 @@
 	width: 6px;
 }
 
-.CodeMirror.ime .CodeMirror-cursor {
+:where(.croq-mirror) .CodeMirror.ime .CodeMirror-cursor {
 	width: 12px;
 	background-color: color-mix(in srgb, var(--croq-mirror-l-brown) 5%, transparent);
 }
 
 /* Laccolla Theme -------------------------------------------------------------- */
 
-.cm-s-laccolla {
+:where(.croq-mirror) .cm-s-laccolla {
 	.cm-comment {
 		color: var(--croq-mirror-l-gray);
 		font-weight: bold;
@@ -337,7 +337,7 @@
 	.cm-variable-3 { color: var(--croq-mirror-l-cyan); }  /* Not Used (for TypeScript) */
 }
 
-.CodeMirror .CodeMirror-activeline {
+:where(.croq-mirror) .CodeMirror .CodeMirror-activeline {
 	.cm-variable:not(.CodeMirror-selectedtext),
 	.cm-variable-2:not(.CodeMirror-selectedtext) {
 		border-radius: 0;
@@ -346,7 +346,7 @@
 
 /* Laccolla Styles for Used Addons --------------------------------------------- */
 
-div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
+:where(.croq-mirror) div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
 	color: inherit;
 	font-weight: bold;
 
@@ -365,7 +365,7 @@ div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
 	}
 }
 
-div.CodeMirror .CodeMirror-activeline .CodeMirror-matchingbracket:not(.cm-comment) {
+:where(.croq-mirror) div.CodeMirror .CodeMirror-activeline .CodeMirror-matchingbracket:not(.cm-comment) {
 	&::before {
 		z-index: -1;
 		top    : 0;
@@ -379,21 +379,21 @@ div.CodeMirror .CodeMirror-activeline .CodeMirror-matchingbracket:not(.cm-commen
 	}
 }
 
-div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
+:where(.croq-mirror) div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	color: var(--croq-mirror-l-gray);
 }
 
-.CodeMirror-focused .CodeMirror-activeline-background {
+:where(.croq-mirror) .CodeMirror-focused .CodeMirror-activeline-background {
 	background: rgb(255 255 255 / 65%);
 	box-shadow: 0 0 4px rgb(0 0 0 / 15%), 0 2px 4px rgb(0 0 0 / 10%);
 }
 
-.CodeMirror-activeline-background {
+:where(.croq-mirror) .CodeMirror-activeline-background {
 	background: none;
 	box-shadow: none;
 }
 
-.cm-s-laccolla .CodeMirror-activeline {
+:where(.croq-mirror) .cm-s-laccolla .CodeMirror-activeline {
 	.cm-atom,
 	.cm-number,
 	.cm-string,
@@ -419,32 +419,32 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 
 /* Others ---------------------------------------------------------------------- */
 
-.cm-space {
+:where(.croq-mirror) .cm-space {
 	visibility: hidden;
 }
 
-.CodeMirror-focused .cm-matchhighlight {
+:where(.croq-mirror) .CodeMirror-focused .cm-matchhighlight {
 	border-width: 0 0 2px 0;
 	border-color: color-mix(in srgb, var(--croq-mirror-l-aqua) 75%, transparent);
 	border-style: dotted;
 }
 
-.CodeMirror-hints {
+:where(.croq-mirror) .CodeMirror-hints {
 	font-family: var(--croq-mirror-font-ui);
 }
 
-.CodeMirror-lint-tooltip {
+:where(.croq-mirror) .CodeMirror-lint-tooltip {
 	font-family: var(--croq-mirror-font-ui);
 	z-index: 999;
 	border: none;
 	box-shadow: 0 0 2px rgb(0 0 0 / 15%), 0 2px 4px rgb(0 0 0 / 25%);
 }
 
-.CodeMirror-Tern-tooltip {
+:where(.croq-mirror) .CodeMirror-Tern-tooltip {
 	display: none;
 }
 
-.lint-error {
+:where(.croq-mirror) .lint-error {
 	font-family: var(--croq-mirror-font-ui);
 	font-size: 85%;
 	background: var(--croq-mirror-l-yellow-35);
@@ -452,8 +452,8 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	color: var(--croq-mirror-l-red);
 }
 
-.lint-error-icon,
-.lint-warning-icon {
+:where(.croq-mirror) .lint-error-icon,
+:where(.croq-mirror) .lint-warning-icon {
 	margin-bottom: 2px;
 	margin-right: 6px;
 	background-position: center center;
@@ -465,19 +465,19 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	position: relative;
 }
 
-.lint-error-icon {
+:where(.croq-mirror) .lint-error-icon {
 	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAHlBMVEW7AAC7AACxAAC7AAC7AAAAAAC4AAC5AAD///+7AAAUdclpAAAABnRSTlMXnORSiwCK0ZKSAAAATUlEQVR42mWPOQ7AQAgDuQLx/z8csYRmPRIFIwRGnosRrpamvkKi0FTIiMASR3hhKW+hAN6/tIWhu9PDWiTGNEkTtIOucA5Oyr9ckPgAWm0GPBog6v4AAAAASUVORK5CYII=");
 }
 
-.lint-warning-icon {
+:where(.croq-mirror) .lint-warning-icon {
 	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAANlBMVEX/uwDvrwD/uwD/uwD/uwD/uwD/uwD/uwD/uwD6twD/uwAAAADurwD2tQD7uAD+ugAAAAD/uwDhmeTRAAAADHRSTlMJ8mN1EYcbmiixgACm7WbuAAAAVklEQVR42n3PUQqAIBBFUU1LLc3u/jdbOJoW1P08DA9Gba8+YWJ6gNJoNYIBzAA2chBth5kLmG9YUoG0NHAUwFXwO9LuBQL1giCQb8gC9Oro2vp5rncCIY8L8uEx5ZkAAAAASUVORK5CYII=");
 }
 
-.error-line {
+:where(.croq-mirror) .error-line {
 	background: hsla(350, 100%, 50%, 0.2);
 }
 
-.code-structure-view {
+:where(.croq-mirror) .code-structure-view {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -488,7 +488,7 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	opacity: 0;
 }
 
-.CodeMirror-dialog {
+:where(.croq-mirror) .CodeMirror-dialog {
 	z-index: 1000;
 	background-color: var(--croq-mirror-color-window);
 	box-shadow: 0 0 2px rgb(0 0 0 / 15%), 0 2px 2px rgb(0 0 0 / 25%);
@@ -502,4 +502,20 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	input {
 		font-family: var(--croq-mirror-font-console);
 	}
+}
+
+.croq-mirror {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+}
+
+.croq-mirror[aria-disabled="true"] {
+	pointer-events: none;
+}
+
+.croq-mirror .CodeMirror-Tern-tooltip {
+	display: block;
+	position: fixed;
 }

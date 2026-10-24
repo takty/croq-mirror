@@ -149,7 +149,7 @@ Explicit `analyzeNow()` requests work even when automatic analysis is disabled, 
 `src/index.js` is the component's public API entry point. `src/lib/` contains internal implementation modules, `src/styles/` the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
-`src/styles/index.css` imports `variables.css`; both use standard CSS. The build bundles imports and expands CSS nesting before scoping selectors to the component.
+`src/styles/index.css` imports `variables.css`; both use standard CSS and explicitly scope their rules to the component. The build bundles imports and expands CSS nesting; it adds component selectors only to the CodeMirror dependency styles.
 It uses esbuild to bundle and minify JavaScript and minify CSS. Intermediate modules are generated in `.build/`, outside the distribution.
 Each component build replaces `dist/` to remove obsolete output files.
 

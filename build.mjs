@@ -94,7 +94,12 @@ async function buildJavaScript() {
 async function buildStyle() {
 	let css = '';
 	for (const file of ['lib/codemirror', 'addon/dialog/dialog', 'addon/hint/show-hint', 'addon/lint/lint', 'addon/tern/tern']) css += await read('codemirror', file + '.css');
-	// Bundle standard CSS imports and expand nesting before adding component selectors.
+	// Scope dependency styles only; our CSS declares its own component scope.
+	const tree = postcss.parse(css);
+	tree.walkRules(rule => {
+		if (rule.parent.type === 'atrule' && /keyframes/.test(rule.parent.name)) return;
+		rule.selectors = rule.selectors.map(s => ':where(.croq-mirror) ' + s);
+	});
 	const styles = await bundle({
 		entryPoints  : [join(root, 'src/styles/index.css')],
 		bundle       : true,
@@ -103,17 +108,7 @@ async function buildStyle() {
 		supported    : { nesting: false },
 		legalComments: 'inline',
 	});
-	css += styles.outputFiles[0].text;
-	const tree = postcss.parse(css);
-	tree.walkRules(rule => {
-		if (rule.parent.type === 'atrule' && /keyframes/.test(rule.parent.name)) return;
-		rule.selectors = rule.selectors.map(s => s === '.croq-mirror' ? s : ':where(.croq-mirror) ' + s);
-	});
-	css = tree.toString() + `
-.croq-mirror { position: relative; width: 100%; height: 100%; min-width: 0; }
-.croq-mirror[aria-disabled="true"] { pointer-events: none; }
-.croq-mirror .CodeMirror-Tern-tooltip { display: block; position: fixed; }
-`;
+	css = tree.toString() + styles.outputFiles[0].text;
 	const minifiedCss = await transform(css, { loader: 'css', minify: true, legalComments: 'inline', target: 'es2022' });
 	await writeFileIfChanged(join(out, 'croq-mirror.min.css'), minifiedCss.code);
 }
