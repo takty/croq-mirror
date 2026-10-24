@@ -155,7 +155,7 @@
 	.CodeMirror-gutter-elt,
 	.CodeMirror-linenumber,
 	.CodeMirror-function-linenumber {
-		cursor: url(cursor-right.svg) 22 8, pointer;
+		cursor: url('../assets/cursor-right.svg') 22 8, pointer;
 	}
 }
 
@@ -164,7 +164,7 @@
 	.CodeMirror-gutter-elt,
 	.CodeMirror-linenumber,
 	.CodeMirror-function-linenumber {
-		cursor: url(cursor-line.svg) 22 8, pointer;
+		cursor: url('../assets/cursor-line.svg') 22 8, pointer;
 	}
 }
 

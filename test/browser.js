@@ -14,6 +14,20 @@ try {
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
 	const editorA = a.getCodeMirror().getWrapperElement();
 	const editorB = b.getCodeMirror().getWrapperElement();
+	const cursorUrls = [];
+	for (const lineSelection of [false, true]) {
+		a.setLineSelectionMode(lineSelection);
+		const cursor = getComputedStyle(editorA.querySelector('.CodeMirror-linenumber')).cursor;
+		const url = cursor.match(/url\("(data:image\/svg\+xml[^"\n]+)"\)/)?.[1];
+		assert(url && cursor.endsWith('22 8, pointer'), 'embedded cursor and hotspot: ' + lineSelection);
+		const image = new Image();
+		image.src = url;
+		await image.decode();
+		assert(image.naturalWidth === 32 && image.naturalHeight === 32, 'embedded cursor decodes: ' + lineSelection);
+		cursorUrls.push(url);
+	}
+	assert(cursorUrls[0] !== cursorUrls[1], 'line selection changes embedded cursor');
+	a.setLineSelectionMode(false);
 	assert(getComputedStyle(editorA).backgroundColor === 'rgb(253, 253, 249)' && getComputedStyle(editorA).color === 'rgb(17, 17, 0)', 'default theme colors preserved');
 	const themeRoot = editorA.closest('.croq-mirror');
 	themeRoot.style.setProperty('--croq-mirror-color-editor', '#123456');

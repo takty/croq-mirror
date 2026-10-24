@@ -99,7 +99,7 @@ async function buildStyle() {
 		entryPoints  : [join(root, 'src/styles/index.css')],
 		bundle       : true,
 		write        : false,
-		external     : ['*.svg'],
+		loader       : { '.svg': 'dataurl' },
 		supported    : { nesting: false },
 		legalComments: 'inline',
 	});
@@ -114,13 +114,11 @@ async function buildStyle() {
 .croq-mirror[aria-disabled="true"] { pointer-events: none; }
 .croq-mirror .CodeMirror-Tern-tooltip { display: block; position: fixed; }
 `;
-	css = css.replaceAll('url(cursor-', 'url(./assets/cursor-');
 	const minifiedCss = await transform(css, { loader: 'css', minify: true, legalComments: 'inline', target: 'es2022' });
 	await writeFileIfChanged(join(out, 'croq-mirror.min.css'), minifiedCss.code);
 }
 
-async function copyAssets() {
-	await copyDirectory(join(root, 'src/assets'), join(out, 'assets'));
+async function copyLicenses() {
 	for (const name of ['codemirror', 'acorn', 'acorn-loose', 'acorn-walk', 'tern', 'jshint', 'jshint-ja-edu', 'js-beautify']) {
 		const dir = resolvePackageDir(name);
 		for (const file of await readdir(dir)) {
@@ -135,7 +133,7 @@ async function build() {
 	await buildLibraries();
 	await buildJavaScript();
 	await buildStyle();
-	await copyAssets();
+	await copyLicenses();
 	console.log('Built dist');
 }
 
