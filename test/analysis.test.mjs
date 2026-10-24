@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze } from '../.build/analyzer.js';
+import { analyze } from '../.build/lib/analyzer.js';
 import { AnalysisClient } from '../src/lib/analysis-client.js';
 
 test('strict and tolerant results retain the existing coordinate contract', () => {

@@ -162,8 +162,8 @@ The distribution contains:
 
 Keep the worker beside the main JavaScript file, and preserve the relative asset paths when deploying.
 English and Japanese JSHint implementations are retained as separate functions. CodeMirror styles and the theme are scoped to the component root.
-Editor UI text is maintained separately in `src/lib/res/lang.en.json` and `src/lib/res/lang.ja.json`.
-Default JSHint and formatting options are stored as data in `src/lib/defaults.json`.
+Editor UI text is maintained separately in `src/res/lang.en.json` and `src/res/lang.ja.json`.
+Default JSHint and formatting options are stored as data in `src/res/defaults.json`.
 The build bundles these resources into the main JavaScript file, so no additional runtime requests or distribution files are required.
 Diagnostic messages remain supplied by the English and Japanese JSHint dependencies.
 Completion and diagnostic popups are also contained within the component. Tern tooltip positioning is adjusted during the build.

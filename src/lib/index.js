@@ -1,9 +1,9 @@
 import { Editor } from './editor-view.js';
 import { CodeMirror, lintEn, lintJa } from './vendor.js';
-import RESOURCES from './defaults.json';
+import RESOURCES from '../res/defaults.json';
 import { AnalysisClient } from './analysis-client.js';
-import english from './res/lang.en.json';
-import japanese from './res/lang.ja.json';
+import english from '../res/lang.en.json';
+import japanese from '../res/lang.ja.json';
 
 // Default settings ------------------------------------------------------------
 

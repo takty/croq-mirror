@@ -6,10 +6,12 @@ import * as sass from 'sass';
 import postcss from 'postcss';
 import { build, transform } from 'esbuild';
 
-const root    = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-const out     = join(root, 'dist');
-const stage   = join(root, '.build');
+const root      = dirname(fileURLToPath(import.meta.url));
+const require   = createRequire(import.meta.url);
+const out       = join(root, 'dist');
+const stageRoot = join(root, '.build');
+const stage     = join(stageRoot, 'lib');
+await rm(stageRoot, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
@@ -78,6 +80,7 @@ const defs = await Promise.all(['ecmascript', 'browser'].map(n => read('tern', `
 vendor += `const defaultDefinitions = ${JSON.stringify(defs)};\nexport { CodeMirror, lintEn, lintJa, beautify, defaultDefinitions };\n`;
 await writeFile(join(stage, 'vendor.js'), vendor);
 for (const file of await readdir(join(root, 'src/lib'))) await cp(join(root, 'src/lib', file), join(stage, file), { recursive: true });
+await cp(join(root, 'src/res'), join(stageRoot, 'res'), { recursive: true });
 await build({
 	entryPoints: {
 		'croq-mirror': join(stage, 'index.js'),
