@@ -12,6 +12,14 @@ try {
 	assert(!window.CodeMirror && !window.acorn && !window.JSHINT && !window.tern, 'no library globals');
 	assert(a.getAnalysis().fnNames[0] === 'one' && b.getAnalysis().fnNames[0] === 'two', 'independent analysis');
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
+	const editorA = a.getCodeMirror().getWrapperElement();
+	const editorB = b.getCodeMirror().getWrapperElement();
+	assert(getComputedStyle(editorA).backgroundColor === 'rgb(253, 253, 249)' && getComputedStyle(editorA).color === 'rgb(17, 17, 0)', 'default theme colors preserved');
+	const themeRoot = editorA.closest('.croq-mirror');
+	themeRoot.style.setProperty('--croq-mirror-color-editor', '#123456');
+	assert(getComputedStyle(editorA).backgroundColor === 'rgb(18, 52, 86)', 'theme custom properties update at runtime');
+	assert(getComputedStyle(editorB).backgroundColor === 'rgb(253, 253, 249)', 'theme custom properties isolated per editor');
+	themeRoot.style.removeProperty('--croq-mirror-color-editor');
 	const ja = a.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	const en = b.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');

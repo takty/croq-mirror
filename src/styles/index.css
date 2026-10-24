@@ -5,43 +5,43 @@
  * @version 2026-08-22
  */
 
-@use 'variables' as *;
+@import "./variables.css";
 
 .CodeMirror {
-	background-color: $color-editor;
-	color: $color-text;
+	background-color: var(--croq-mirror-color-editor);
+	color           : var(--croq-mirror-color-text);
 
-	width: 100%;
-	height: 100%;
+	width     : 100%;
+	height    : 100%;
 	max-height: 100%;
 
-	margin: 0;
+	margin : 0;
 	padding: 0;
 
 	font-family: monospace;
-	font-size: 16px;
+	font-size  : 16px;
 	line-height: 165%;
 }
 
 .CodeMirror > div:first-child {
-	overflow: visible !important;
-	opacity: 0;
+	overflow      : visible !important;
+	opacity       : 0;
 	pointer-events: none;
 
 	&::before { content: 'x'; }
 	> textarea {
-		bottom: unset !important;
+		bottom    : unset !important;
 		margin-top: -1rem;
 	}
 }
 
 .CodeMirror-rulers {
-	z-index: 3;
+	z-index       : 3;
 	pointer-events: none;
 }
 
 .CodeMirror-scrollbar-filler {
-	background-color: $color-editor;
+	background-color: var(--croq-mirror-color-editor);
 }
 
 .CodeMirror pre {
@@ -53,7 +53,7 @@
 .CodeMirror-line::selection,
 .CodeMirror-line > span::selection,
 .CodeMirror-line > span > span::selection {
-	background-color: rgba($L-Aqua-60, 0.5);
+	background-color: color-mix(in srgb, var(--croq-mirror-l-aqua-60) 50%, transparent);
 }
 
 .CodeMirror-selectedtext {
@@ -69,27 +69,27 @@
 	&::before,
 	&::after {
 		overflow: visible;
-		display: inline-block;
-		width: 0;
-		z-index: -1;
+		display : inline-block;
+		width   : 0;
+		z-index : -1;
 
 		pointer-events: none;
-		white-space: nowrap;
+		white-space   : nowrap;
 
-		color: $L-Red-15;
+		color      : var(--croq-mirror-l-red-15);
 		font-weight: normal;
 		text-shadow: #fff 0 0 4px;
-		transform: scaleX(0.8);
+		transform  : scaleX(0.8);
 	}
 	&::before {
-		content: '-';
+		content : '-';
 		position: absolute;
-		left: 5%;
+		left    : 5%;
 	}
 	&::after {
-		content: '>';
+		content : '>';
 		position: absolute;
-		left: 25%;
+		left    : 25%;
 	}
 }
 
@@ -99,7 +99,7 @@
 
 .CodeMirror.wordwrap pre > * { text-indent: 0; }
 
-// Gutter ----------------------------------------------------------------------
+/* Gutter ---------------------------------------------------------------------- */
 
 .CodeMirror-gutter-background {
 	z-index: 0;
@@ -109,35 +109,35 @@
 	height: 100%;
 }
 
-.CodeMirror-gutters {  // includes right border
-	background-color: $color-window;
-	border-right: 16px solid transparent;
-	border-left: 0;
-	height: 100%;
-	cursor: text;
+.CodeMirror-gutters {  /* includes right border */
+	background-color: var(--croq-mirror-color-window);
+	border-right    : 16px solid transparent;
+	border-left     : 0;
+	height          : 100%;
+	cursor          : text;
 
 	pointer-events: none;
 	&::after {
-		content: '';
-		display: block;
-		position: absolute;
-		top: 0;
-		right: -16px;
-		width: 16px;
-		height: 100%;
-		pointer-events: auto;
-		transition: 0.25s;
-		background-color: rgba($L-Purple, 0.25);
+		content         : '';
+		display         : block;
+		position        : absolute;
+		top             : 0;
+		right           : -16px;
+		width           : 16px;
+		height          : 100%;
+		pointer-events  : auto;
+		transition      : 0.25s;
+		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
 	.CodeMirror:not(.simple) &:hover::after {
-		background-color: rgba($L-Purple, 0.45);
-		transition: 0.25s;
+		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 45%, transparent);
+		transition      : 0.25s;
 	}
 	&.function-linenumbers {
 		&::after {
-			background-color: rgba($L-Purple, 0.25);
-			background-size: auto auto;
-			background-image: repeating-linear-gradient(135deg, transparent, transparent 8px, rgba($L-Purple, 0.15) 8px, rgba($L-Purple, 0.15) 16px )
+			background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
+			background-size : auto auto;
+			background-image: repeating-linear-gradient(135deg, transparent, transparent 8px, color-mix(in srgb, var(--croq-mirror-l-purple) 15%, transparent) 8px, color-mix(in srgb, var(--croq-mirror-l-purple) 15%, transparent) 16px )
 		}
 	}
 }
@@ -169,16 +169,16 @@
 }
 
 .CodeMirror-lint-markers {
-	border-left: 4px solid $color-window;
+	border-left: 4px solid var(--croq-mirror-color-window);
 }
 
 .CodeMirror-activeline-gutter .CodeMirror-linenumber {
 	font-weight: bold;
-	color: $color-text;
+	color: var(--croq-mirror-color-text);
 }
 
 :not(.CodeMirror-activeline-gutter) > .CodeMirror-linenumber {
-	color: $L-DarkGray;
+	color: var(--croq-mirror-l-darkgray);
 }
 
 .CodeMirror-linenumber {
@@ -194,11 +194,11 @@
 		pointer-events: auto;
 	}
 	.CodeMirror:not(.simple) &:hover::before {
-		background-color: rgba($L-Purple, 0.25);
+		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
 }
 
-// Function Number Gutter ------------------------------------------------------
+/* Function Number Gutter ------------------------------------------------------ */
 
 .CodeMirror-function-linenumber,
 .CodeMirror-function-number {
@@ -209,19 +209,19 @@
 
 .CodeMirror-function-linenumber {
 	text-align: right;
-	color: $L-DarkGray;
+	color: var(--croq-mirror-l-darkgray);
 }
 
 .CodeMirror-function-number {
 	text-align: left;
-	color: $L-Brown;
+	color: var(--croq-mirror-l-brown);
 }
 
 .CodeMirror-activeline-gutter {
 	.CodeMirror-function-linenumber,
 	.CodeMirror-function-number {
 		font-weight: bold;
-		color: $color-text;
+		color: var(--croq-mirror-color-text);
 	}
 }
 
@@ -239,7 +239,7 @@
 		left: -200px;
 		right: 0;
 		height: 100%;
-		background-color: rgba($L-LightGray, 0.75);
+		background-color: color-mix(in srgb, var(--croq-mirror-l-lightgray) 75%, transparent);
 	}
 	height: 100%;
 }
@@ -258,11 +258,11 @@
 		pointer-events: auto;
 	}
 	.CodeMirror:not(.simple) &:hover::before {
-		background-color: rgba($L-Purple, 0.25);
+		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
 	.CodeMirror:not(.simple) &.CodeMirror-function-even {
 		&:hover::before {
-			background-color: rgba($L-Purple, 0.65);
+			background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 65%, transparent);
 		}
 	}
 }
@@ -275,18 +275,18 @@
 		right   : 2px;
 
 		background-color: hsla(40, 100%, 50%, 0.75);
-		border          : solid 2px rgba(#fff, 0.75);
+		border          : solid 2px rgb(255 255 255 / 75%);
 		border-radius   : 50%;
 
 		padding-bottom: calc(100% - 7px);
 	}
 }
 
-// Cursor ----------------------------------------------------------------------
+/* Cursor ---------------------------------------------------------------------- */
 
 .CodeMirror-cursor {
-	border-left:   2px solid rgba($L-Brown, 0.60);
-	border-bottom: 2px solid rgba($L-Brown, 0.35);
+	border-left:   2px solid color-mix(in srgb, var(--croq-mirror-l-brown) 60%, transparent);
+	border-bottom: 2px solid color-mix(in srgb, var(--croq-mirror-l-brown) 35%, transparent);
 	border-radius: 0 0 0 2px;
 	box-sizing: border-box;
 	width: 6px;
@@ -294,47 +294,47 @@
 
 .CodeMirror.ime .CodeMirror-cursor {
 	width: 12px;
-	background-color: rgba($L-Brown, 0.05);
+	background-color: color-mix(in srgb, var(--croq-mirror-l-brown) 5%, transparent);
 }
 
-// Laccolla Theme --------------------------------------------------------------
+/* Laccolla Theme -------------------------------------------------------------- */
 
 .cm-s-laccolla {
 	.cm-comment {
-		color: $L-Gray;
+		color: var(--croq-mirror-l-gray);
 		font-weight: bold;
 	}
 	.cm-keyword,
 	.cm-operator,
 	.cm-meta {
-		color: $L-BodyBrown;
+		color: var(--croq-mirror-l-bodybrown);
 		font-weight: bold;
 	}
 	.cm-atom,
 	.cm-number,
 	.cm-string:not(.cm-property),
-	.cm-string-2:not(.cm-property) {  // String quoted by back quotes (`)
-		color: $L-Orange;
+	.cm-string-2:not(.cm-property) {  /* String quoted by back quotes (`) */
+		color: var(--croq-mirror-l-orange);
 		font-weight: bold;
-		text-shadow: $L-Yellow 0 0 0.25em;
+		text-shadow: var(--croq-mirror-l-yellow) 0 0 0.25em;
 	}
 	.cm-def {
-		color: $color-text;
+		color: var(--croq-mirror-color-text);
 		font-weight: bold;
 	}
-	.cm-variable { color: $L-Turquoise; }  // Global Varialbe
-	.cm-variable-2 { color: hsl(86, 60%, 30%); }  // Local Variable
+	.cm-variable { color: var(--croq-mirror-l-turquoise); }  /* Global Varialbe */
+	.cm-variable-2 { color: hsl(86, 60%, 30%); }  /* Local Variable */
 	.cm-variable:not(.CodeMirror-selectedtext),
 	.cm-variable-2:not(.CodeMirror-selectedtext) {
 		border-radius: 0 0.35em 0.35em 0;
-		box-shadow: 0 2px 6px rgba($L-Blue, 0.15), 0 -1px 6px rgba($L-Blue, 0.15);
-		background-color: rgba($color-editor, 0.95);
+		box-shadow: 0 2px 6px color-mix(in srgb, var(--croq-mirror-l-blue) 15%, transparent), 0 -1px 6px color-mix(in srgb, var(--croq-mirror-l-blue) 15%, transparent);
+		background-color: color-mix(in srgb, var(--croq-mirror-color-editor) 95%, transparent);
 	}
-	.cm-property { color: $L-Blue; }
+	.cm-property { color: var(--croq-mirror-l-blue); }
 	.cm-error {
-		border-bottom: 0.15em solid $L-Red;
+		border-bottom: 0.15em solid var(--croq-mirror-l-red);
 	}
-	.cm-variable-3 { color: $L-Cyan; }  // Not Used (for TypeScript)
+	.cm-variable-3 { color: var(--croq-mirror-l-cyan); }  /* Not Used (for TypeScript) */
 }
 
 .CodeMirror .CodeMirror-activeline {
@@ -344,7 +344,7 @@
 	}
 }
 
-// Laccolla Styles for Used Addons ---------------------------------------------
+/* Laccolla Styles for Used Addons --------------------------------------------- */
 
 div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
 	color: inherit;
@@ -361,7 +361,7 @@ div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
 		bottom  : -0.45em;
 
 		border-radius: 50%;
-		border: 0.5em solid rgba($L-Yellow, 0.65);
+		border: 0.5em solid color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
 	}
 }
 
@@ -375,17 +375,17 @@ div.CodeMirror .CodeMirror-activeline .CodeMirror-matchingbracket:not(.cm-commen
 
 		border-radius: 0.25em;
 		border: none;
-		background-color: rgba($L-Yellow, 0.65);
+		background-color: color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
 	}
 }
 
 div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
-	color: $L-Gray;
+	color: var(--croq-mirror-l-gray);
 }
 
 .CodeMirror-focused .CodeMirror-activeline-background {
-	background: rgba(#fff, 0.65);
-	box-shadow: 0 0 4px rgba(#000, 0.15), 0 2px 4px rgba(#000, 0.10);
+	background: rgb(255 255 255 / 65%);
+	box-shadow: 0 0 4px rgb(0 0 0 / 15%), 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .CodeMirror-activeline-background {
@@ -402,12 +402,12 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	}
 	.cm-space {
 		visibility: visible;
-		color: $L-Red-15;
+		color: var(--croq-mirror-l-red-15);
 		font-weight: bold
 	}
 	.cm-tab::before,
 	.cm-tab::after {
-		color: $L-Red-35;
+		color: var(--croq-mirror-l-red-35);
 		text-shadow: none;
 	}
 	.cm-variable,
@@ -417,7 +417,7 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 	}
 }
 
-// Others ----------------------------------------------------------------------
+/* Others ---------------------------------------------------------------------- */
 
 .cm-space {
 	visibility: hidden;
@@ -425,19 +425,19 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 
 .CodeMirror-focused .cm-matchhighlight {
 	border-width: 0 0 2px 0;
-	border-color: rgba($L-Aqua, 0.75);
+	border-color: color-mix(in srgb, var(--croq-mirror-l-aqua) 75%, transparent);
 	border-style: dotted;
 }
 
 .CodeMirror-hints {
-	font-family: $font-ui;
+	font-family: var(--croq-mirror-font-ui);
 }
 
 .CodeMirror-lint-tooltip {
-	font-family: $font-ui;
+	font-family: var(--croq-mirror-font-ui);
 	z-index: 999;
 	border: none;
-	box-shadow: 0 0 2px rgba(#000, 0.15), 0 2px 4px rgba(#000, 0.25);
+	box-shadow: 0 0 2px rgb(0 0 0 / 15%), 0 2px 4px rgb(0 0 0 / 25%);
 }
 
 .CodeMirror-Tern-tooltip {
@@ -445,11 +445,11 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 }
 
 .lint-error {
-	font-family: $font-ui;
+	font-family: var(--croq-mirror-font-ui);
 	font-size: 85%;
-	background: $L-Yellow-35;
+	background: var(--croq-mirror-l-yellow-35);
 	padding: 2px 5px 3px;
-	color: $L-Red;
+	color: var(--croq-mirror-l-red);
 }
 
 .lint-error-icon,
@@ -489,17 +489,17 @@ div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
 }
 
 .CodeMirror-dialog {
-	z-index: 999+1;
-	background-color: $color-window;
-	box-shadow: 0 0 2px rgba(#000, 0.15), 0 2px 2px rgba(#000, 0.25);
+	z-index: 1000;
+	background-color: var(--croq-mirror-color-window);
+	box-shadow: 0 0 2px rgb(0 0 0 / 15%), 0 2px 2px rgb(0 0 0 / 25%);
 
-	font-family: $font-ui;
-	font-size: $font-size;
+	font-family: var(--croq-mirror-font-ui);
+	font-size: var(--croq-mirror-font-size);
 
 	button {
 		font-family: inherit;
 	}
 	input {
-		font-family: $font-console;
+		font-family: var(--croq-mirror-font-console);
 	}
 }

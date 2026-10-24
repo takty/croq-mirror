@@ -105,15 +105,14 @@ try {
 				assert(JSON.parse(document.querySelector('#status').textContent).readOnly, 'Read-only control must work');
 				await document.querySelector('#recreate').onclick();
 				assert(document.querySelectorAll('.CodeMirror').length === 1, 'Editor must recreate');
-				await document.fonts.ready;
-				assert(document.fonts.check('16px CroqInconsolata'), 'Bundled font must load');
+				assert(getComputedStyle(document.querySelector('.CodeMirror')).fontFamily === 'monospace', 'Default editor font must be monospace');
 				return true;
 			})()`,
 			awaitPromise: true,
 			returnByValue: true,
 		}, sessionId);
 		if (docs.exceptionDetails || docs.result?.value !== true) throw new Error('Built docs check failed: ' + JSON.stringify(docs));
-		console.log('Built docs passed: one editor, worker, read-only, recreate, font, subdirectory URLs.');
+		console.log('Built docs passed: one editor, worker, read-only, recreate, default font, subdirectory URLs.');
 		if (process.argv.includes('--screenshot')) {
 			const capture = await send('Page.captureScreenshot', { format: 'png' }, sessionId);
 			await writeFile(resolve(here, `${name}-example.png`), Buffer.from(capture.data, 'base64'));

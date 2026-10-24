@@ -1,9 +1,9 @@
-import { Editor } from './editor-view.js';
-import { CodeMirror, lintEn, lintJa } from './vendor.js';
-import RESOURCES from '../res/defaults.json';
-import { AnalysisClient } from './analysis-client.js';
-import english from '../res/lang.en.json';
-import japanese from '../res/lang.ja.json';
+import { Editor } from './lib/editor-view.js';
+import { CodeMirror, lintEn, lintJa } from './lib/vendor.js';
+import RESOURCES from './res/defaults.json';
+import { AnalysisClient } from './lib/analysis-client.js';
+import english from './res/lang.en.json';
+import japanese from './res/lang.ja.json';
 
 // Default settings ------------------------------------------------------------
 
@@ -11,7 +11,7 @@ const mounted = new WeakSet();
 const LANGUAGES = { en: english, ja: japanese };
 const DEFAULT_SETTINGS = {
 	language            : 'ja',
-	fontFamily          : 'CroqInconsolata, "Hiragino Sans", "BIZ UDGothic", "Yu Gothic Medium", Meiryo, monospace',
+	fontFamily          : 'monospace',
 	fontSize            : 16,
 	lineHeight          : 165,
 	lineWrapping        : false,

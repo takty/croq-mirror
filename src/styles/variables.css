@@ -1,0 +1,41 @@
+/**
+ * CSS custom properties
+ *
+ * @author Takuto Yanagida
+ * @version 2026-10-24
+ */
+
+.croq-mirror {
+	--croq-mirror-l-red         : #e61e58;
+	--croq-mirror-l-red-35      : #f6b0c5;
+	--croq-mirror-l-red-15      : #fbdde6;
+	--croq-mirror-l-orange      : #f5a200;
+	--croq-mirror-l-orange-b    : #f18400;
+	--croq-mirror-l-orange-50   : #fbd290;
+	--croq-mirror-l-yellow      : #fdde00;
+	--croq-mirror-l-yellow-35   : #fef3a6;
+	--croq-mirror-l-yellowgreen : #7eba2e;
+	--croq-mirror-l-palegreen   : #4db28d;
+	--croq-mirror-l-palegreen-25: #d2ece2;
+	--croq-mirror-l-turquoise   : #005363;
+	--croq-mirror-l-cyan        : #009ddf;
+	--croq-mirror-l-aqua        : #60b3e5;
+	--croq-mirror-l-aqua-60     : #a0d1ef;
+	--croq-mirror-l-blue        : #2e449a;
+	--croq-mirror-l-purple      : #9a74a3;
+	--croq-mirror-l-brown       : #4e4138;
+	--croq-mirror-l-bodybrown   : #7c6a5a;
+	--croq-mirror-l-lightgray   : #e8e8e8;
+	--croq-mirror-l-gray        : #b5b5b6;
+	--croq-mirror-l-darkgray    : #898989;
+
+	--croq-mirror-color-editor: #fdfdf9;
+	--croq-mirror-color-text  : #110;
+	--croq-mirror-color-window: #f8f8f8;
+
+	--croq-mirror-font-ui     : "Lucida Grande", "Hiragino Sans", "Yu Gothic UI", "Meiryo UI", sans-serif;
+	--croq-mirror-font-console: 'Hiragino Sans', "Yu Gothic UI", "Meiryo UI", monospace;
+	--croq-mirror-font-size   : 14px;
+
+	--croq-mirror-size-toolbar-button: 40px;
+}

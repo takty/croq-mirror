@@ -26,7 +26,6 @@
 		"esbuild": "^0.28.2",
 		"klales": "github:takty/klales",
 		"postcss": "^8.5.28",
-		"sass": "^1.105.1",
 		"vite": "^8.3.4"
 	},
 	"description": "CodeMirror 5 based editor component extracted from Croqujs",

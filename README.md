@@ -84,7 +84,7 @@ Use `setDefinitions` to change additional definitions after initialization.
 | Setting | Default | Description |
 | --- | --- | --- |
 | `language` | `'ja'` | `'ja'` or `'en'` |
-| `fontFamily` | Bundled fonts with Japanese font fallbacks | CSS font-family value |
+| `fontFamily` | `monospace` | CSS font-family value; custom fonts must be provided by the host application |
 | `fontSize` | `16` | 10-64 px |
 | `lineHeight` | `165` | Positive percentage |
 | `lineWrapping` | `false` | Line wrapping |
@@ -146,8 +146,10 @@ Explicit `analyzeNow()` requests work even when automatic analysis is disabled, 
 
 ## Sources and build
 
-`src/lib/` contains component sources, `src/styles/` the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution.
+`src/index.js` is the component's public API entry point. `src/lib/` contains internal implementation modules, `src/styles/` the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
+It organizes library preparation, JavaScript bundling, styles, and assets into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
+`src/styles/index.css` imports `variables.css`; both use standard CSS. The build bundles imports and expands CSS nesting before scoping selectors to the component.
 It uses esbuild to bundle and minify JavaScript and minify CSS. Intermediate modules are generated in `.build/`, outside the distribution.
 Each component build replaces `dist/` to remove obsolete output files.
 
@@ -157,10 +159,11 @@ The distribution contains:
 - `analysis-worker.min.js`: the analysis worker and its parser dependencies
 - `croq-mirror.min.css`: the combined, scoped editor styles
 - JavaScript source maps for debugging; these are not required at runtime
-- `assets/`: fonts and cursor images
+- `assets/`: cursor images
 - `licenses/`: third-party licenses
 
 Keep the worker beside the main JavaScript file, and preserve the relative asset paths when deploying.
+No font files or `@font-face` declarations are bundled. The host application can load its own fonts and select them using `fontFamily`; search input fonts can be set with `--croq-mirror-font-console` on `.croq-mirror`.
 English and Japanese JSHint implementations are retained as separate functions. CodeMirror styles and the theme are scoped to the component root.
 Editor UI text is maintained separately in `src/res/lang.en.json` and `src/res/lang.ja.json`.
 Default JSHint and formatting options are stored as data in `src/res/defaults.json`.
