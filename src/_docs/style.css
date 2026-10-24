@@ -1,0 +1,19 @@
+body {
+	margin: 24px;
+}
+
+.container {
+	height  : 480px;
+	border  : 1px solid #ccc;
+	resize  : vertical;
+	overflow: hidden;
+}
+
+button {
+	margin: 4px 2px;
+}
+
+#status {
+	white-space: pre-wrap;
+}
+

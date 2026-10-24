@@ -1,0 +1,505 @@
+/**
+ * CodeMirror Style (CSS)
+ *
+ * @author Takuto Yanagida
+ * @version 2026-08-22
+ */
+
+@use 'variables' as *;
+
+.CodeMirror {
+	background-color: $color-editor;
+	color: $color-text;
+
+	width: 100%;
+	height: 100%;
+	max-height: 100%;
+
+	margin: 0;
+	padding: 0;
+
+	font-family: monospace;
+	font-size: 16px;
+	line-height: 165%;
+}
+
+.CodeMirror > div:first-child {
+	overflow: visible !important;
+	opacity: 0;
+	pointer-events: none;
+
+	&::before { content: 'x'; }
+	> textarea {
+		bottom: unset !important;
+		margin-top: -1rem;
+	}
+}
+
+.CodeMirror-rulers {
+	z-index: 3;
+	pointer-events: none;
+}
+
+.CodeMirror-scrollbar-filler {
+	background-color: $color-editor;
+}
+
+.CodeMirror pre {
+	padding-left: 2px;
+}
+
+.CodeMirror-selected,
+.CodeMirror-focused .CodeMirror-selected,
+.CodeMirror-line::selection,
+.CodeMirror-line > span::selection,
+.CodeMirror-line > span > span::selection {
+	background-color: rgba($L-Aqua-60, 0.5);
+}
+
+.CodeMirror-selectedtext {
+	text-shadow:
+		#fff -1px  1px 8px,
+		#fff  1px -1px 8px,
+		#fff  1px  1px 8px,
+		#fff -1px -1px 8px !important;
+}
+
+.cm-tab {
+	position: relative;
+	&::before,
+	&::after {
+		overflow: visible;
+		display: inline-block;
+		width: 0;
+		z-index: -1;
+
+		pointer-events: none;
+		white-space: nowrap;
+
+		color: $L-Red-15;
+		font-weight: normal;
+		text-shadow: #fff 0 0 4px;
+		transform: scaleX(0.8);
+	}
+	&::before {
+		content: '-';
+		position: absolute;
+		left: 5%;
+	}
+	&::after {
+		content: '>';
+		position: absolute;
+		left: 25%;
+	}
+}
+
+.CodeMirror-wrap pre {
+	word-break: break-all;
+}
+
+.CodeMirror.wordwrap pre > * { text-indent: 0; }
+
+// Gutter ----------------------------------------------------------------------
+
+.CodeMirror-gutter-background {
+	z-index: 0;
+}
+
+.CodeMirror-gutter-wrapper {
+	height: 100%;
+}
+
+.CodeMirror-gutters {  // includes right border
+	background-color: $color-window;
+	border-right: 16px solid transparent;
+	border-left: 0;
+	height: 100%;
+	cursor: text;
+
+	pointer-events: none;
+	&::after {
+		content: '';
+		display: block;
+		position: absolute;
+		top: 0;
+		right: -16px;
+		width: 16px;
+		height: 100%;
+		pointer-events: auto;
+		transition: 0.25s;
+		background-color: rgba($L-Purple, 0.25);
+	}
+	.CodeMirror:not(.simple) &:hover::after {
+		background-color: rgba($L-Purple, 0.45);
+		transition: 0.25s;
+	}
+	&.function-linenumbers {
+		&::after {
+			background-color: rgba($L-Purple, 0.25);
+			background-size: auto auto;
+			background-image: repeating-linear-gradient(135deg, transparent, transparent 8px, rgba($L-Purple, 0.15) 8px, rgba($L-Purple, 0.15) 16px )
+		}
+	}
+}
+
+.CodeMirror-gutter {
+	padding-left: 4px;
+}
+
+.CodeMirror-gutter-elt {
+	height: 100%;
+}
+
+.CodeMirror:not(.line-selection-mode) {
+	.CodeMirror-gutter,
+	.CodeMirror-gutter-elt,
+	.CodeMirror-linenumber,
+	.CodeMirror-function-linenumber {
+		cursor: url(cursor-right.svg) 22 8, pointer;
+	}
+}
+
+.CodeMirror.line-selection-mode {
+	.CodeMirror-gutter,
+	.CodeMirror-gutter-elt,
+	.CodeMirror-linenumber,
+	.CodeMirror-function-linenumber {
+		cursor: url(cursor-line.svg) 22 8, pointer;
+	}
+}
+
+.CodeMirror-lint-markers {
+	border-left: 4px solid $color-window;
+}
+
+.CodeMirror-activeline-gutter .CodeMirror-linenumber {
+	font-weight: bold;
+	color: $color-text;
+}
+
+:not(.CodeMirror-activeline-gutter) > .CodeMirror-linenumber {
+	color: $L-DarkGray;
+}
+
+.CodeMirror-linenumber {
+	pointer-events: none;
+	&::before {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		display: block;
+		left: -200px;
+		right: -4px;
+		height: 100%;
+		pointer-events: auto;
+	}
+	.CodeMirror:not(.simple) &:hover::before {
+		background-color: rgba($L-Purple, 0.25);
+	}
+}
+
+// Function Number Gutter ------------------------------------------------------
+
+.CodeMirror-function-linenumber,
+.CodeMirror-function-number {
+	padding: 0 7px 0 1px;
+	min-width: 20px;
+	white-space: nowrap;
+}
+
+.CodeMirror-function-linenumber {
+	text-align: right;
+	color: $L-DarkGray;
+}
+
+.CodeMirror-function-number {
+	text-align: left;
+	color: $L-Brown;
+}
+
+.CodeMirror-activeline-gutter {
+	.CodeMirror-function-linenumber,
+	.CodeMirror-function-number {
+		font-weight: bold;
+		color: $color-text;
+	}
+}
+
+.CodeMirror-function-odd {
+	height: 100%;
+}
+
+.CodeMirror-function-even {
+	&::after {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		display: block;
+		top: 0;
+		left: -200px;
+		right: 0;
+		height: 100%;
+		background-color: rgba($L-LightGray, 0.75);
+	}
+	height: 100%;
+}
+
+.CodeMirror-function-linenumber,
+.CodeMirror-function-number {
+	pointer-events: none;
+	&::before {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		display: block;
+		left: -200px;
+		right: 0;
+		height: 100%;
+		pointer-events: auto;
+	}
+	.CodeMirror:not(.simple) &:hover::before {
+		background-color: rgba($L-Purple, 0.25);
+	}
+	.CodeMirror:not(.simple) &.CodeMirror-function-even {
+		&:hover::before {
+			background-color: rgba($L-Purple, 0.65);
+		}
+	}
+}
+
+.cm-annotate-scrollbar-function-marker {
+	&::after {
+		content : '';
+		position: absolute;
+		left    : 1px;
+		right   : 2px;
+
+		background-color: hsla(40, 100%, 50%, 0.75);
+		border          : solid 2px rgba(#fff, 0.75);
+		border-radius   : 50%;
+
+		padding-bottom: calc(100% - 7px);
+	}
+}
+
+// Cursor ----------------------------------------------------------------------
+
+.CodeMirror-cursor {
+	border-left:   2px solid rgba($L-Brown, 0.60);
+	border-bottom: 2px solid rgba($L-Brown, 0.35);
+	border-radius: 0 0 0 2px;
+	box-sizing: border-box;
+	width: 6px;
+}
+
+.CodeMirror.ime .CodeMirror-cursor {
+	width: 12px;
+	background-color: rgba($L-Brown, 0.05);
+}
+
+// Laccolla Theme --------------------------------------------------------------
+
+.cm-s-laccolla {
+	.cm-comment {
+		color: $L-Gray;
+		font-weight: bold;
+	}
+	.cm-keyword,
+	.cm-operator,
+	.cm-meta {
+		color: $L-BodyBrown;
+		font-weight: bold;
+	}
+	.cm-atom,
+	.cm-number,
+	.cm-string:not(.cm-property),
+	.cm-string-2:not(.cm-property) {  // String quoted by back quotes (`)
+		color: $L-Orange;
+		font-weight: bold;
+		text-shadow: $L-Yellow 0 0 0.25em;
+	}
+	.cm-def {
+		color: $color-text;
+		font-weight: bold;
+	}
+	.cm-variable { color: $L-Turquoise; }  // Global Varialbe
+	.cm-variable-2 { color: hsl(86, 60%, 30%); }  // Local Variable
+	.cm-variable:not(.CodeMirror-selectedtext),
+	.cm-variable-2:not(.CodeMirror-selectedtext) {
+		border-radius: 0 0.35em 0.35em 0;
+		box-shadow: 0 2px 6px rgba($L-Blue, 0.15), 0 -1px 6px rgba($L-Blue, 0.15);
+		background-color: rgba($color-editor, 0.95);
+	}
+	.cm-property { color: $L-Blue; }
+	.cm-error {
+		border-bottom: 0.15em solid $L-Red;
+	}
+	.cm-variable-3 { color: $L-Cyan; }  // Not Used (for TypeScript)
+}
+
+.CodeMirror .CodeMirror-activeline {
+	.cm-variable:not(.CodeMirror-selectedtext),
+	.cm-variable-2:not(.CodeMirror-selectedtext) {
+		border-radius: 0;
+	}
+}
+
+// Laccolla Styles for Used Addons ---------------------------------------------
+
+div.CodeMirror span.CodeMirror-matchingbracket:not(.cm-comment) {
+	color: inherit;
+	font-weight: bold;
+
+	position: relative;
+	&::before {
+		content : '';
+		position: absolute;
+		z-index : -1;
+		top     : -0.45em;
+		left    : -0.75em;
+		right   : -0.75em;
+		bottom  : -0.45em;
+
+		border-radius: 50%;
+		border: 0.5em solid rgba($L-Yellow, 0.65);
+	}
+}
+
+div.CodeMirror .CodeMirror-activeline .CodeMirror-matchingbracket:not(.cm-comment) {
+	&::before {
+		z-index: -1;
+		top    : 0;
+		left   : 0.05em;
+		right  : 0.05em;
+		bottom : 0;
+
+		border-radius: 0.25em;
+		border: none;
+		background-color: rgba($L-Yellow, 0.65);
+	}
+}
+
+div.CodeMirror span.CodeMirror-matchingbracket.cm-comment {
+	color: $L-Gray;
+}
+
+.CodeMirror-focused .CodeMirror-activeline-background {
+	background: rgba(#fff, 0.65);
+	box-shadow: 0 0 4px rgba(#000, 0.15), 0 2px 4px rgba(#000, 0.10);
+}
+
+.CodeMirror-activeline-background {
+	background: none;
+	box-shadow: none;
+}
+
+.cm-s-laccolla .CodeMirror-activeline {
+	.cm-atom,
+	.cm-number,
+	.cm-string,
+	.cm-string-2 {
+		text-shadow: none;
+	}
+	.cm-space {
+		visibility: visible;
+		color: $L-Red-15;
+		font-weight: bold
+	}
+	.cm-tab::before,
+	.cm-tab::after {
+		color: $L-Red-35;
+		text-shadow: none;
+	}
+	.cm-variable,
+	.cm-variable-2 {
+		box-shadow: none;
+		background-color: transparent;
+	}
+}
+
+// Others ----------------------------------------------------------------------
+
+.cm-space {
+	visibility: hidden;
+}
+
+.CodeMirror-focused .cm-matchhighlight {
+	border-width: 0 0 2px 0;
+	border-color: rgba($L-Aqua, 0.75);
+	border-style: dotted;
+}
+
+.CodeMirror-hints {
+	font-family: $font-ui;
+}
+
+.CodeMirror-lint-tooltip {
+	font-family: $font-ui;
+	z-index: 999;
+	border: none;
+	box-shadow: 0 0 2px rgba(#000, 0.15), 0 2px 4px rgba(#000, 0.25);
+}
+
+.CodeMirror-Tern-tooltip {
+	display: none;
+}
+
+.lint-error {
+	font-family: $font-ui;
+	font-size: 85%;
+	background: $L-Yellow-35;
+	padding: 2px 5px 3px;
+	color: $L-Red;
+}
+
+.lint-error-icon,
+.lint-warning-icon {
+	margin-bottom: 2px;
+	margin-right: 6px;
+	background-position: center center;
+	background-repeat: no-repeat;
+	display: inline-block;
+	height: 16px;
+	width: 16px;
+	vertical-align: middle;
+	position: relative;
+}
+
+.lint-error-icon {
+	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAHlBMVEW7AAC7AACxAAC7AAC7AAAAAAC4AAC5AAD///+7AAAUdclpAAAABnRSTlMXnORSiwCK0ZKSAAAATUlEQVR42mWPOQ7AQAgDuQLx/z8csYRmPRIFIwRGnosRrpamvkKi0FTIiMASR3hhKW+hAN6/tIWhu9PDWiTGNEkTtIOucA5Oyr9ckPgAWm0GPBog6v4AAAAASUVORK5CYII=");
+}
+
+.lint-warning-icon {
+	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAANlBMVEX/uwDvrwD/uwD/uwD/uwD/uwD/uwD/uwD/uwD6twD/uwAAAADurwD2tQD7uAD+ugAAAAD/uwDhmeTRAAAADHRSTlMJ8mN1EYcbmiixgACm7WbuAAAAVklEQVR42n3PUQqAIBBFUU1LLc3u/jdbOJoW1P08DA9Gba8+YWJ6gNJoNYIBzAA2chBth5kLmG9YUoG0NHAUwFXwO9LuBQL1giCQb8gC9Oro2vp5rncCIY8L8uEx5ZkAAAAASUVORK5CYII=");
+}
+
+.error-line {
+	background: hsla(350, 100%, 50%, 0.2);
+}
+
+.code-structure-view {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+
+	transition: opacity 0.2s;
+	opacity: 0;
+}
+
+.CodeMirror-dialog {
+	z-index: 999+1;
+	background-color: $color-window;
+	box-shadow: 0 0 2px rgba(#000, 0.15), 0 2px 2px rgba(#000, 0.25);
+
+	font-family: $font-ui;
+	font-size: $font-size;
+
+	button {
+		font-family: inherit;
+	}
+	input {
+		font-family: $font-console;
+	}
+}
