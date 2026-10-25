@@ -66,7 +66,6 @@ Initialization failures reject the promise and clean up resources and DOM elemen
 | `highlightLine(line)` | Highlights a line and returns an ID for clearing it |
 | `clearHighlight(id)` | Clears the specified highlight |
 | `getFunctionLineNumber(line)` | Returns `[functionNumber, lineWithinFunction]`, or `[0, line + 1]` when analysis is unavailable |
-| `getCodeMirror()` | Returns the CodeMirror 5 instance; direct access is outside future compatibility guarantees |
 | `refresh()` | Redraws the editor, for example after revealing a hidden container |
 | `destroy()` | Releases resources and removes the DOM; safe to call repeatedly |
 
@@ -79,7 +78,7 @@ Position APIs use **zero-based lines and UTF-16 columns** as `{line, ch}`. Repla
 Host document APIs remain available when the editor is read-only or disabled; these settings restrict user interaction.
 
 Editing commands invoked through `execute` do not run in read-only mode. When disabled, all commands and `moveTo` do nothing.
-Operations after destruction throw errors. Do not use a previously obtained CodeMirror instance after destruction.
+Operations after destruction throw errors.
 
 ### Settings
 

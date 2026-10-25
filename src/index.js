@@ -362,10 +362,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				if (!Number.isInteger(line) || line < 0 || line > cm.lastLine()) throw new RangeError('Invalid line');
 				return view.getSectionLineNumber(line);
 			},
-			getCodeMirror() {
-				assertAlive();
-				return cm;
-			},
 			refresh() {
 				assertAlive();
 				view.refresh(true);

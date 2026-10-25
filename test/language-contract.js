@@ -4,6 +4,10 @@ import { plainLanguage } from '../.build/lang/plain/index.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
 
 export async function runLanguageContractTests(assert) {
+	const ja = javascriptLanguage.diagnostics('var x = 1', 'ja', { esversion: 10, varstmt: true });
+	const en = javascriptLanguage.diagnostics('var x = 1', 'en', { esversion: 10, varstmt: true });
+	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');
+	assert(!plainLanguage.autoCloseBrackets && !plainLanguage.matchBrackets, 'plain language disables bracket insertion and matching');
 	const plainClient = plainLanguage.createAnalysisClient();
 	await plainClient.ready;
 	assert(await plainClient.request('text', 1) === null, 'plain analysis client returns no result');

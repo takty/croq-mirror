@@ -136,14 +136,13 @@ The public API includes:
 - Analysis result retrieval, update notifications, and explicit requests
 - Navigation by line and column
 - Line highlighting and clearing
-- Access to the CodeMirror instance for extensions
 - Destruction
 
 Initialization is asynchronous and returns an instance after required setup is complete. Initialization failures must be observable by the caller.
 
 Provide `destroy()` to release owned DOM elements, events, timers, workers, and completion servers. Allow recreation in the same container.
 
-Provide ordinary operations through the croq-mirror API. Direct CodeMirror access is an extension mechanism tied to CodeMirror 5; compatibility is not guaranteed for a future migration to CodeMirror 6.
+Provide operations through the croq-mirror API. The underlying editor instance is not exposed as a public API.
 
 ## 9. Standalone verification and integration
 
