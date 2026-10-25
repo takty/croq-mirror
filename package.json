@@ -1,6 +1,8 @@
 {
 	"name": "croq-mirror",
 	"version": "0.1.0",
+	"description": "CodeMirror 5 based editor component extracted from Croqujs",
+	"license": "MIT",
 	"private": true,
 	"type": "module",
 	"exports": "./dist/croq-mirror.min.js",
@@ -13,7 +15,7 @@
 		"test:browser": "node build.mjs && vite build && node test/headless.mjs"
 	},
 	"dependencies": {
-		"acorn": "8.18.0",
+		"acorn": "8.19.0",
 		"acorn-loose": "8.5.2",
 		"acorn-walk": "8.3.5",
 		"codemirror": "5.65.21",
@@ -28,7 +30,5 @@
 		"postcss": "^8.5.28",
 		"vite": "^8.3.4"
 	},
-	"description": "CodeMirror 5 based editor component extracted from Croqujs",
-	"license": "MIT",
 	"packageManager": "yarn@4.18.0"
 }
