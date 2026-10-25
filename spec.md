@@ -44,7 +44,7 @@ The host application is responsible for:
 - Toolbars, menus, settings screens, dialogs, and output panes
 - Receiving, interpreting, and displaying runtime errors
 - Persisting settings
-- Explicit clipboard reads and writes
+- Application-specific clipboard operations, such as clipboard inspection and image copying
 
 UI directly associated with editing, such as completion lists, diagnostics, and search fields, belongs to the component. Keep surrounding application UI outside it wherever possible.
 
@@ -98,7 +98,9 @@ Preserve the current Croqujs automatic formatting behavior as the default.
 
 - Support ordinary keyboard copy, cut, and paste operations.
 - Provide APIs to get and replace selected text.
-- Leave explicit clipboard reads and writes, such as those triggered by external buttons, to the host.
+- Expose `cut`, `copy`, and `paste` through `execute(command)`, focusing the editor and using `document.execCommand` as in the original editor.
+- Block all three commands when disabled; allow only `copy` when read-only.
+- Leave clipboard inspection, menu state, and image copying to the host.
 
 ## 7. Analysis and exposed results
 

@@ -14,6 +14,81 @@ try {
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
 	const editorA = a.getCodeMirror().getWrapperElement();
 	const editorB = b.getCodeMirror().getWrapperElement();
+	b.focus();
+	const focusEvents = [];
+	const offFocus = a.on('focus', () => focusEvents.push('focus'));
+	const offBlur = a.on('blur', () => focusEvents.push('blur'));
+	a.focus();
+	assert(a.hasFocus() && !b.hasFocus(), 'focus API targets one editor');
+	a.blur();
+	assert(!a.hasFocus() && focusEvents.join(',') === 'focus,blur', 'blur API and focus events');
+	offFocus();
+	offBlur();
+	a.setSettings({ readOnly: true });
+	a.focus();
+	assert(a.hasFocus(), 'read-only editor can receive focus');
+	a.setSettings({ disabled: true });
+	assert(!a.hasFocus(), 'disabling editor removes input focus');
+	b.focus();
+	a.focus();
+	a.blur();
+	assert(!a.hasFocus() && b.hasFocus(), 'disabled focus and unrelated blur do not steal focus');
+	a.setSettings({ readOnly: false, disabled: false });
+	a.setSettings({ lineWrapping: true });
+	const simpleOptions = { scrollbarStyle: 'null', readOnly: 'nocursor', styleActiveLine: false, cursorBlinkRate: -1, cursorHeight: 0, lineWrapping: false };
+	const cmA = a.getCodeMirror();
+	const beforeSimple = Object.fromEntries(Object.keys(simpleOptions).map(key => [key, cmA.getOption(key)]));
+	const originalView = a.setSimpleView();
+	assert(Object.entries(simpleOptions).every(([key, value]) => cmA.getOption(key) === value) && editorA.classList.contains('simple'), 'simple view applies capture options');
+	assert(a.getSettings().lineWrapping && !a.getSettings().readOnly && !editorB.classList.contains('simple'), 'simple view preserves settings and other editor');
+	a.setSettings({ disabled: true });
+	a.setSimpleView();
+	a.setSettings({ disabled: false });
+	a.restoreView(originalView);
+	assert(Object.entries(beforeSimple).every(([key, value]) => cmA.getOption(key) === value) && !editorA.classList.contains('simple'), 'simple view restores original options after capture sequence');
+	a.setSettings({ lineWrapping: false });
+	const captureFailure = new Error('capture failed');
+	for (const disabled of [false, true]) {
+		a.setSettings({ disabled, readOnly: true, lineWrapping: true });
+		const previousReadOnly = cmA.getOption('readOnly');
+		let failure;
+		try {
+			await a.captureImage(async rect => {
+				assert(rect.width > 0 && rect.height > 0 && a.getState().disabled, 'capture callback receives bounds while disabled');
+				let concurrentRejected = false;
+				try { await a.captureImage(() => {}); } catch { concurrentRejected = true; }
+				assert(concurrentRejected, 'concurrent image capture rejected');
+				throw captureFailure;
+			});
+		} catch (error) { failure = error; }
+		assert(failure === captureFailure && a.getState().disabled === disabled && cmA.getOption('readOnly') === previousReadOnly && cmA.getOption('lineWrapping') && !editorA.classList.contains('simple'), 'capture failure restores view and previous disabled state');
+	}
+	a.setSettings({ disabled: false, readOnly: false, lineWrapping: false });
+	const clipboardCalls = [];
+	const originalExecCommand = document.execCommand;
+	try {
+		document.execCommand = command => {
+			clipboardCalls.push(command);
+			assert(editorA.contains(document.activeElement), 'clipboard command focuses target editor: ' + command);
+			return true;
+		};
+		for (const command of ['cut', 'copy', 'paste']) {
+			b.focus();
+			a.execute(command);
+		}
+		assert(clipboardCalls.join(',') === 'cut,copy,paste', 'clipboard commands delegate to document');
+		clipboardCalls.length = 0;
+		a.setSettings({ readOnly: true });
+		for (const command of ['cut', 'copy', 'paste']) a.execute(command);
+		assert(clipboardCalls.join(',') === 'copy', 'read-only allows copy only');
+		clipboardCalls.length = 0;
+		a.setSettings({ disabled: true });
+		for (const command of ['cut', 'copy', 'paste']) a.execute(command);
+		assert(clipboardCalls.length === 0, 'disabled blocks clipboard commands');
+	} finally {
+		document.execCommand = originalExecCommand;
+		a.setSettings({ readOnly: false, disabled: false });
+	}
 	const cursorUrls = [];
 	for (const lineSelection of [false, true]) {
 		a.setLineSelectionMode(lineSelection);
@@ -130,6 +205,11 @@ try {
 	assert(a.getCodeMirror().getWrapperElement().getBoundingClientRect().height === 420, 'container resize');
 	a.destroy();
 	a.destroy();
+	for (const method of ['focus', 'blur', 'hasFocus', 'setSimpleView', 'restoreView']) {
+		let rejected = false;
+		try { a[method](); } catch (error) { rejected = error.message === 'Editor destroyed'; }
+		assert(rejected, method + ' rejects after destroy');
+	}
 	assert(document.querySelector('#a').childNodes.length === 0, 'destroy is idempotent and empties container');
 	a = await createEditor(document.querySelector('#a'), { value: 'const recreated = true;' });
 	assert(a.getValue().includes('recreated') && b.getValue().includes('two'), 'recreate without affecting sibling');
