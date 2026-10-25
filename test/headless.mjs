@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { preview } from 'vite';
+import { build } from 'esbuild';
 const here = dirname(fileURLToPath(import.meta.url));
 const browser = process.argv[2] || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const name = browser.toLowerCase().includes('msedge') ? 'edge' : 'chrome';
@@ -14,6 +15,7 @@ const root = resolve(here, '..');
 const fixtures = await mkdtemp(resolve(tmpdir(), 'croq-mirror-browser-'));
 await mkdir(resolve(fixtures, 'test'));
 await Promise.all([
+	build({ entryPoints: [resolve(here, 'language-contract.js')], outfile: resolve(fixtures, 'test/language-contract.js'), bundle: true, format: 'esm', platform: 'browser', logLevel: 'silent' }),
 	cp(resolve(root, 'dist'), resolve(fixtures, 'dist'), { recursive: true }),
 	cp(resolve(root, 'docs'), resolve(fixtures, 'docs'), { recursive: true }),
 	...['browser.html', 'browser.js'].map(file => cp(resolve(here, file), resolve(fixtures, 'test', file))),

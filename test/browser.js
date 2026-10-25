@@ -7,7 +7,7 @@ const assert = (condition, message) => {
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 let a, b;
 try {
-	a = await createEditor(document.querySelector('#a'), { value: 'function one() { return 1; }', autoFormat: false });
+	a = await createEditor(document.querySelector('#a'), { value: 'function one() { return 1; }', language: 'ja', autoFormat: false });
 	b = await createEditor(document.querySelector('#b'), { value: 'function two() { return 2; }', language: 'en', autoFormat: false });
 	assert(!window.CodeMirror && !window.acorn && !window.JSHINT && !window.tern, 'no library globals');
 	assert(a.getAnalysis().fnNames[0] === 'one' && b.getAnalysis().fnNames[0] === 'two', 'independent analysis');
@@ -256,6 +256,8 @@ try {
 	assert(document.querySelector('#a').childNodes.length === 0, 'destroy is idempotent and empties container');
 	a = await createEditor(document.querySelector('#a'), { value: 'const recreated = true;' });
 	assert(a.getValue().includes('recreated') && b.getValue().includes('two'), 'recreate without affecting sibling');
+	assert(a.getSettings().language === 'en' && a.getCodeMirror().phrase('Search:') === 'Search:', 'omitted UI language defaults to English');
+	assert(a.getSettings().codeLanguage === 'javascript' && a.getCodeMirror().getMode().name === 'javascript' && a.getAnalysis().success, 'omitted code language retains JavaScript analysis');
 	b.destroy();
 	a.destroy();
 	const NativeWorker = window.Worker;
@@ -276,6 +278,41 @@ try {
 	} finally {
 		window.Worker = NativeWorker;
 	}
+	window.Worker = class { constructor() { throw new Error('Plain text must not create a worker'); } };
+	try {
+		a = await createEditor(document.querySelector('#a'), { codeLanguage: null, value: 'const broken = ;\nordinary text', functionLineNumbers: true });
+		const plain = a.getCodeMirror();
+		assert(a.getSettings().codeLanguage === null && plain.getOption('mode') === 'text/plain' && plain.getMode().name === 'null', 'explicit null selects plain text without a worker');
+		plain.performLint();
+		assert(plain.getOption('lineNumbers') && !document.querySelector('#a .CodeMirror-lint-marker') && !plain.getOption('autoCloseBrackets'), 'plain text uses ordinary numbers without diagnostics or bracket insertion');
+		assert(a.getAnalysis() === null && await a.analyzeNow() === null, 'plain text has no analysis snapshot');
+		const original = a.getValue();
+		for (const command of ['format', 'complete', 'toggleComment']) a.execute(command);
+		a.setDefinitions([{ '!name': 'unused' }]);
+		assert(a.getValue() === original && !document.querySelector('#a .CodeMirror-hints'), 'language-specific commands leave plain text unchanged');
+		a.replaceRange('!', { line: 1, ch: 13 });
+		a.execute('undo');
+		assert(a.getValue() === original, 'plain text retains editing and undo');
+		a.setSettings({ language: 'ja', analysis: true, completion: true, diagnostics: true });
+		plain.performLint();
+		assert(plain.phrase('Search:') !== 'Search:' && plain.getMode().name === 'null' && !document.querySelector('#a .CodeMirror-lint-marker'), 'plain text locale switches independently without producing diagnostics');
+		a.execute('find');
+		assert(document.querySelector('#a .CodeMirror-dialog input'), 'plain text search remains available');
+		let rejected = false;
+		try { a.setSettings({ codeLanguage: 'javascript' }); } catch { rejected = true; }
+		assert(rejected && a.getSettings().codeLanguage === null, 'code language is selected at creation');
+		a.destroy();
+		for (const codeLanguage of ['python', false, 42]) {
+			let invalid = false;
+			try { await createEditor(document.querySelector('#a'), { codeLanguage }); } catch (error) { invalid = error instanceof TypeError; }
+			assert(invalid && !document.querySelector('#a').childNodes.length, 'unsupported code language rejected before mounting: ' + codeLanguage);
+		}
+	} finally {
+		a?.destroy();
+		window.Worker = NativeWorker;
+	}
+	const { runLanguageContractTests } = await import('./language-contract.js');
+	await runLanguageContractTests(assert);
 	window.testResult = { passed: true, results };
 } catch (error) {
 	window.testResult = { passed: false, results, error: error.stack };

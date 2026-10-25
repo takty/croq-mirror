@@ -5,18 +5,16 @@
  * @version 2021-02-24
  */
 
-import { CodeMirror, beautify as js_beautify, defaultDefinitions } from './vendor.js';
+import { CodeMirror } from './lib/vendor.js';
 
 'use strict';
 
 export class Editor {
 
-	constructor(owner, domElm) {
-		this._owner           = owner;
-		this._codeStructure   = {};
-		this._ternServer      = null;
-		this._defaultDefJsons = [];
-		this._formatOpts      = {};
+	constructor({ language, phrases, onFontSizeChange }, domElm) {
+		this._language = language;
+		this._onFontSizeChange = onFontSizeChange;
+		this._presentation = language.presentation();
 
 		this._timers     = new Set();
 		this._abort      = new AbortController();
@@ -33,8 +31,8 @@ export class Editor {
 		this._lastLineNumWidth = 0;
 		this._lastLineNumChars = 0;
 
-		this._comp = new CodeMirror(domElm, this.codeMirrorOptions());
-		this._comp.getMode().closeBrackets = '()[]\'\'""``';  // Must Overwrite JavaScript Mode Here!
+		this._comp = new CodeMirror(domElm, this.codeMirrorOptions(phrases));
+		Object.assign(this._comp.getMode(), language.modeOptions);
 		this._elem = this._comp.getWrapperElement();
 		this._comp.setOption('hintOptions', { container: domElm });
 		this._elem.style.userSelect = 'none';
@@ -55,7 +53,7 @@ export class Editor {
 		this._annotateScrollbar = this._comp.annotateScrollbar('cm-annotate-scrollbar-function-marker');
 		this.functionLineNumberEnabled(false);
 
-		this._defaultDefJsons = structuredClone(defaultDefinitions);
+		this._completionSession = this._language.createCompletionSession(this._comp);
 		this.initAutoComplete();
 
 		this._comp.on('renderLine', (cm, line, elt) => {
@@ -67,16 +65,16 @@ export class Editor {
 		});
 	}
 
-	codeMirrorOptions() {
+	codeMirrorOptions(phrases) {
 		return {
-			mode: 'javascript',
-			autoCloseBrackets: true,
+			mode: this._language.mode,
+			autoCloseBrackets: this._language.autoCloseBrackets,
 			lineNumbers: true,
 			indentUnit: 4,
 			indentWithTabs: true,
 			gutters: ['CodeMirror-lint-markers', 'CodeMirror-function-linenumbers', 'CodeMirror-linenumbers'],
 			extraKeys: {
-				'Ctrl-\\'     : (cm) => this._complete(cm, this._ternServer),
+				'Ctrl-\\'     : () => this.complete(),
 				'Shift-Ctrl-R': false,
 				'Shift-Tab'   : 'indentLess',
 				'F3'          : 'findPersistent',
@@ -87,7 +85,7 @@ export class Editor {
 				'Cmd-Shift-G' : 'findPersistentPrev',
 			},
 			highlightSelectionMatches: true,
-			matchBrackets: true,
+			matchBrackets: this._language.matchBrackets,
 			showCursorWhenSelecting: true,
 			dragDrop: true,
 			cursorBlinkRate: 530,
@@ -106,7 +104,7 @@ export class Editor {
 				return e;
 			},
 			historyEventDelay: 200,
-			phrases: this._owner._res.editorPhrase,
+			phrases,
 		};
 	}
 
@@ -145,7 +143,7 @@ export class Editor {
 	initWheelZoom() {
 		this._listen(this._elem, 'wheel', (e) => {
 			if (!this._isEnabled || !e.ctrlKey) return;
-			this._owner.executeCommand(e.deltaY > 0 ? 'fontSizeMinus' : 'fontSizePlus');
+			this._onFontSizeChange(e.deltaY > 0 ? -2 : 2);
 		}, { passive: true });
 	}
 
@@ -197,51 +195,28 @@ export class Editor {
 	}
 
 	_updateCodeStructureView() {
-		const cs = this._codeStructure;
 		if (this._destroyed) return;
 		const ctx = this._canvas.getContext('2d');
-
 		ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-		if (cs.fnLocs) {
-			ctx.fillStyle = 'hsla(40, 100%, 50%, 0.15)';
-			for (let loc of cs.fnLocs) this._drawSyntaxRange(ctx, loc);
-		}
-		if (cs.ifLocs) {
-			ctx.fillStyle = 'hsla(150, 100%, 35%, 0.15)';
-			for (let loc of cs.ifLocs) this._drawSyntaxRange(ctx, loc);
-		}
-		if (cs.forLocs) {
-			ctx.fillStyle = 'hsla(190, 90%, 50%, 0.20)';
-			for (let loc of cs.forLocs) this._drawSyntaxRange(ctx, loc);
-		}
-		if (cs.varLocs) {
-			ctx.fillStyle = 'hsla(0, 0%, 97%, 1)';
-			ctx.strokeStyle = 'hsla(0, 0%, 69%, 0.75)';
-			for (let loc of cs.varLocs) this._drawSyntaxToken(ctx, loc);
-		}
-		if (cs.letLocs) {
-			ctx.fillStyle = 'hsla(205, 100%, 97%, 1)';
-			ctx.strokeStyle = 'hsla(205, 100%, 52%, 0.75)';
-			for (let loc of cs.letLocs) this._drawSyntaxToken(ctx, loc);
-		}
-		if (cs.constLocs) {
-			ctx.fillStyle = 'hsla(240, 75%, 97%, 1)';
-			ctx.strokeStyle = 'hsla(240, 75%, 65%, 0.75)';
-			for (let loc of cs.constLocs) this._drawSyntaxToken(ctx, loc);
+		for (const decoration of this._presentation.decorations) {
+			ctx.fillStyle = decoration.fill;
+			if (decoration.kind === 'range') this._drawSyntaxRange(ctx, decoration);
+			else if (decoration.kind === 'token') {
+				ctx.strokeStyle = decoration.stroke;
+				this._drawSyntaxToken(ctx, decoration);
+			}
 		}
 		this._canvas.style.opacity = 1;
 	}
 
-	_drawSyntaxRange(ctx, pos) {
-		const bgn = pos[0], end = pos[1];
-		const scc = this._comp.charCoords({ line: bgn.line - 1, ch: bgn.column }, 'local');
-		const ecc = this._comp.charCoords({ line: end.line - 1, ch: end.column }, 'local');
+	_drawSyntaxRange(ctx, { from: bgn, to: end, spineChars, branchChars, branches }) {
+		const scc = this._comp.charCoords(bgn, 'local');
+		const ecc = this._comp.charCoords(end, 'local');
 		scc.left += 4;
 
 		const lh = this._comp.defaultTextHeight();
-		const tcc = this._comp.charCoords({ line: bgn.line - 1, ch: bgn.column + 3 }, 'local');
-		const iw = tcc.right - scc.left - 3;
+		const tcc = this._comp.charCoords({ line: bgn.line, ch: bgn.ch + spineChars }, 'local');
+		const iw = tcc.right - scc.left - spineChars;
 		const w = ctx.canvas.width / 2;
 
 		this._fillLeftRoundedRect(ctx, scc.left, scc.top + 3, iw, ecc.top - scc.top + lh - 6, lh / 1.5);
@@ -250,19 +225,18 @@ export class Editor {
 			this._fillRightRoundedRect(ctx, scc.left + iw, ecc.top + 3, w, lh - 6, lh / 1.5);
 		}
 
-		const elsecc = this._comp.charCoords({ line: bgn.line - 1, ch: bgn.column + 4 }, 'local');
-		const elsew = elsecc.right - scc.left - 4;
+		const branchEnd = this._comp.charCoords({ line: bgn.line, ch: bgn.ch + branchChars }, 'local');
+		const branchWidth = branchEnd.right - scc.left - branchChars;
 
-		for (let i = 2; i < pos.length; i += 1) {
-			const icc = this._comp.charCoords({ line: pos[i].line - 1, ch: pos[i].column }, 'local');
-			this._fillRightRoundedRect(ctx, scc.left + iw, icc.top + 3, elsew, lh - 6, lh / 1.5);
+		for (const branch of branches) {
+			const icc = this._comp.charCoords(branch, 'local');
+			this._fillRightRoundedRect(ctx, scc.left + iw, icc.top + 3, branchWidth, lh - 6, lh / 1.5);
 		}
 	}
 
-	_drawSyntaxToken(ctx, pos) {
-		const bgn = pos[0], end = pos[1];
-		const scc = this._comp.charCoords({ line: bgn.line - 1, ch: bgn.column }, 'local');
-		const ecc = this._comp.charCoords({ line: end.line - 1, ch: end.column }, 'local');
+	_drawSyntaxToken(ctx, { from: bgn, to: end }) {
+		const scc = this._comp.charCoords(bgn, 'local');
+		const ecc = this._comp.charCoords(end, 'local');
 		scc.left -= 2;
 
 		const th = this._comp.defaultTextHeight();
@@ -415,26 +389,25 @@ export class Editor {
 	// -------------------------------------------------------------------------
 
 	initAutoComplete() {
-		this._isDotTyped = false;
-		this._ternServer = new CodeMirror.TernServer({ defs: this._defaultDefJsons });
-		this._comp.on('cursorActivity', (cm) => { if (this._completion && this._isEnabled && !this._isReadOnly) this._ternServer.updateArgHints(cm); });
+		this._allowShortCompletion = false;
+		this._comp.on('cursorActivity', (cm) => { if (this._completion && this._isEnabled && !this._isReadOnly) this._completionSession.updateArgumentHints(); });
 
 		const ek = this._comp.getOption('extraKeys');
-		ek['Ctrl-Tab'] = (cm) => { this._complete(cm, this._ternServer); };
+		ek['Ctrl-Tab'] = () => this.complete();
 		this._comp.setOption('extraKeys', ek);
 
-		const reg = /\w|\./;
 		let autoComp = null;
 		this._comp.on('keypress', (cm, e) => {
 			if (!this._completion || e.isComposing) return;
-			if (reg.test(e.key)) {
-				if (e.key === '.') this._isDotTyped = true;
+			const trigger = this._language.completionTrigger(e.key);
+			if (trigger) {
+				if (trigger.allowShort) this._allowShortCompletion = true;
 				if (autoComp) this._cancelLater(autoComp);
 				autoComp = this._later(() => {
 					const elm = this._elem.closest('.croq-mirror').querySelector('.CodeMirror-hints');
-					if (!elm && e.key !== '.') this._isDotTyped = false;
-					this._complete(cm, this._ternServer);
-				}, 500);
+					if (!elm && !trigger.allowShort) this._allowShortCompletion = false;
+					this.complete();
+				}, trigger.delay);
 			} else {
 				if (!autoComp) return;
 				this._cancelLater(autoComp);
@@ -443,15 +416,14 @@ export class Editor {
 		});
 	}
 
-	updateAutoComplete(defs) {
-		this._disposeTern();
-		const ds = this._defaultDefJsons.concat(defs);
-		this._ternServer = new CodeMirror.TernServer({ defs: ds });
+	setDefinitions(defs) {
+		this._completionSession.setDefinitions(defs);
 	}
 
-	_complete(cm, server) {
-		if (!this._completion || !this._isEnabled || this._isReadOnly || !server) return;
-		const fn = (cm, c) => this._hint(server, cm, c);
+	complete() {
+		if (!this._completion || !this._isEnabled || this._isReadOnly) return;
+		const cm = this._comp;
+		const fn = (_cm, callback) => this._completionSession.complete({ allowShort: this._allowShortCompletion }, callback);
 		fn.async = true;
 		cm.showHint({ container: this._elem.closest('.croq-mirror'), hint: fn, completeSingle: false, customKeys: {
 			Up      : function (cm, handle) { handle.moveFocus(-1); },
@@ -466,34 +438,6 @@ export class Editor {
 		} });
 	}
 
-	_hint(ts, cm, c) {
-		ts.request(cm, { type: 'completions', types: true, includeKeywords: true }, (error, data) => {
-			if (error) { c(null); return; }
-			const from = data.start, to = data.end;
-			if (from.line !== to.line) { c(null); return; }
-			const len = to.ch - from.ch;
-			if (!this._isDotTyped && len < 3) { c(null); return; }
-
-			const list = [];
-			for (const c of data.completions) {
-				let className = this._typeToIcon(c.type);
-				if (data.guess) className += ' CodeMirror-Tern-guess';
-				list.push({ text: c.name, displayText: c.displayName || c.name, className: className, data: c });
-			}
-			c({ from, to, list });
-		});
-	}
-
-	_typeToIcon(type) {
-		let suffix;
-		if (type === '?') suffix = 'unknown';
-		else if (type === 'number' || type === 'string' || type === 'bool') suffix = type;
-		else if (/^fn\(/.test(type)) suffix = 'fn';
-		else if (/^\[/.test(type)) suffix = 'array';
-		else suffix = 'object';
-		return 'CodeMirror-Tern-' + 'completion ' + 'CodeMirror-Tern-' + 'completion-' + suffix;
-	}
-
 	// -------------------------------------------------------------------------
 
 	autoIndentEnabled(flag) {
@@ -501,10 +445,6 @@ export class Editor {
 	}
 
 	initAutoFormat() {
-		const useTab = this._comp.getOption('indentWithTabs'), tabSize = this._comp.getOption('tabSize');
-		this._formatOpts = Object.assign({}, this._owner._res.jsBeautifyOpt);
-		Object.assign(this._formatOpts, { indent_char: (useTab ? '\t' : ' '), indent_size: (useTab ? 1 : tabSize), indent_with_tabs: useTab });
-
 		const doc = this._comp.getDoc();
 		let changedLine = -1;
 
@@ -540,84 +480,44 @@ export class Editor {
 		const end = { line: line, ch: str.length };
 		const orig = doc.getRange(bgn, end);
 
-		const [text, doIndent] = this._doFormat(orig + '\n')
-		if (text === false) return;
+		const result = this._language.formatLine(orig + '\n', {
+			autoIndent: this._isAutoIndentEnabled,
+			indentWithTabs: this._comp.getOption('indentWithTabs'),
+			tabSize: this._comp.getOption('tabSize'),
+		});
+		if (!result) return;
+		const { text, indent: doIndent } = result;
 		if (1 < text.split('\n').length) return;
 		this._formatting = true;
 		try {
 			this._comp.operation(() => {
 				if (orig !== text) doc.replaceRange(text, bgn, end);
-				if (this._codeStructure.success && doIndent) this._comp.indentLine(line);
+				if (this._presentation.canIndent && doIndent) this._comp.indentLine(line);
 			});
 		} finally {
 			this._formatting = false;
 		}
 	}
 
-	_doFormat(text, force = false) {
-		try {
-			const indent = this._isAutoIndentEnabled ? false : text.match(/^(\s+)/);
-			const commentIndent = text.match(/^(\s*\/\/)/);
-			text = js_beautify(text, this._formatOpts);
-			text = this._formatCommentWhitespace(text);
-			if (force) return [text, true];
-			if (commentIndent) {
-				if (commentIndent[0].startsWith('//')) {
-					text = text.replace(/^\/\//, commentIndent[0]);
-				} else {
-					text = text.replace(/^\s*\/\/\s*/, commentIndent[0] + ' ');
-				}
-				return [text, false];
-			} else if (indent) {
-				text = text.replace(/^\s+/, indent[0]);
-				return [text, false];
-			}
-			return [text, true];
-		} catch (e) {
-			console.error(e);
-		}
-		return [false, false];
-	}
-
-	_formatCommentWhitespace(text) {
-		const m = text.match(/\S+\s*(\/\/.+)$/);
-		if (!m) return text;
-
-		let state      = '';
-		let lastIdx    = -1;
-		let isLastEsc  = false;
-		let slashCount = 0;
-
-		for (let i = 0; i < text.length; i += 1) {
-			const c = text[i];
-			if (!isLastEsc && (c === "'" || c === '"' || c === '`')) {
-				if (state === '') {
-					state = c;
-					slashCount = 0;
-				} else if (state === c) {
-					state = '';
-					lastIdx = i;
-				}
-			} else if (state === '' && c === '/') {
-				slashCount += 1;
-				if (slashCount === 2) break;
-			} else {
-				slashCount = 0;
-			}
-			if (isLastEsc) isLastEsc = false;
-			else if (!isLastEsc && c === '\\') isLastEsc = true;
-		}
-		if (state === '' && lastIdx !== -1) {
-			const head = text.substring(0, lastIdx);
-			const tail = text.substring(lastIdx);
-			text = head + tail.replace(/(\S+)\s*\/\/\s*(.+)$/, '$1  // $2');  // Make the blank before the comment two blanks
-		} else {
-			text = text.replace(/(\S+)\s*\/\//m, '$1  //');  // Make the blank before the comment two blanks
-		}
-		return text;
-	}
-
 	// =========================================================================
+
+	autoFormatEnabled(flag) { this._autoFormat = flag; }
+	completionEnabled(flag) { this._completion = flag; }
+	composing(flag) { this._elem.classList.toggle('ime', flag); }
+
+	setDiagnostics(provider) {
+		this._comp.setOption('lint', provider ? { selfContain: true, getAnnotations: provider } : false);
+	}
+
+	getSectionLineNumber(line) {
+		let number = 0, start = 0;
+		for (const boundary of this._presentation.sectionStarts) {
+			if (boundary > line) break;
+			number++;
+			start = boundary;
+		}
+		return [number, line - start + 1];
+	}
 
 	getComponent() {
 		return this._comp;
@@ -648,12 +548,12 @@ export class Editor {
 		this._comp.setValue(content);
 		this._comp.getDoc().clearHistory();
 		this._comp.getDoc().setCursor(0, 0);
-		this._codeStructure = {};
+		this._presentation = this._language.presentation();
 		this.refresh();
 	}
 
-	setCodeStructureData(data) {
-		this._codeStructure = data;
+	setPresentation(data = this._language.presentation()) {
+		this._presentation = data;
 		this._updateLineNumberGutter();
 		if (this._canvas.style.opacity === '1') {  // for the first time
 			this._clearCanvas();
@@ -762,7 +662,7 @@ export class Editor {
 
 	_updateLineNumberGutter() {
 		this._comp.clearGutter('CodeMirror-function-linenumbers');
-		if (this._isFunctionLineNumberEnabled) {
+		if (this._isFunctionLineNumberEnabled && this._presentation.lineNumbers !== 'absolute') {
 			this._comp.setOption('lineNumbers', false);
 			this._comp.operation(() => {
 				const fl = this._elem.getElementsByClassName('CodeMirror-function-linenumbers')[0];
@@ -784,15 +684,15 @@ export class Editor {
 
 	_updateFuncLineNoGutter() {
 		const lineCount = this._comp.getDoc().lineCount();
-		const fnStarts  = this._codeStructure.fnStarts;
+		const sectionStarts = this._presentation.sectionStarts;
 
 		this._lineNoByFunc = [];
-		if (lineCount === 0 || !fnStarts || fnStarts.length === 0) {
+		if (lineCount === 0 || !sectionStarts || sectionStarts.length === 0) {
 			for (let i = 0; i < lineCount; i++) this._lineNoByFunc.push([0, i + 1]);
 		} else {
 			let fnIdx = 0, local = 1;
 			for (let i = 0; i < lineCount; i += 1) {
-				if (fnStarts[fnIdx] !== undefined && i === fnStarts[fnIdx]) {
+				if (sectionStarts[fnIdx] !== undefined && i === sectionStarts[fnIdx]) {
 					local = 1;
 					fnIdx += 1;
 				}
@@ -802,8 +702,8 @@ export class Editor {
 		}
 
 		const as = [];
-		if (fnStarts) {
-			for (const fnIdx of fnStarts) {
+		if (sectionStarts) {
+			for (const fnIdx of sectionStarts) {
 				as.push({ from: { line: fnIdx }, to: { line: fnIdx } });
 			}
 		}
@@ -849,13 +749,6 @@ export class Editor {
 		return this._lastLineNumWidth + 'px';
 	}
 
-	_disposeTern() {
-		if (!this._ternServer) return;
-		for (const name of Object.keys(this._ternServer.docs)) this._ternServer.delDoc(name);
-		this._ternServer.destroy();
-		this._ternServer = null;
-	}
-
 	_cancelLater(id) {
 		clearTimeout(id);
 		this._timers.delete(id);
@@ -881,7 +774,7 @@ export class Editor {
 		this._comp.closeHint?.();
 		this._comp.setOption('lint', false);
 		this._annotateScrollbar?.clear();
-		this._disposeTern();
+		this._completionSession.destroy();
 		this._comp.getInputField().blur();
 		this._elem.remove();
 	}

@@ -1,7 +1,6 @@
-import { Editor } from './lib/editor-view.js';
-import { CodeMirror, lintEn, lintJa } from './lib/vendor.js';
-import RESOURCES from './res/defaults.json';
-import { AnalysisClient } from './lib/analysis-client.js';
+import { Editor } from './editor-view.js';
+import { javascriptLanguage } from './lang/js/index.js';
+import { plainLanguage } from './lang/plain/index.js';
 import english from './res/lang.en.json';
 import japanese from './res/lang.ja.json';
 
@@ -10,7 +9,8 @@ import japanese from './res/lang.ja.json';
 const mounted = new WeakSet();
 const LANGUAGES = { en: english, ja: japanese };
 const DEFAULT_SETTINGS = {
-	language            : 'ja',
+	language            : 'en',
+	codeLanguage        : 'javascript',
 	fontFamily          : 'monospace',
 	fontSize            : 16,
 	lineHeight          : 165,
@@ -31,6 +31,10 @@ const DEFAULT_SETTINGS = {
 function validate(options) {
 	for (const [key, value] of Object.entries(options)) {
 		if (!(key in DEFAULT_SETTINGS)) throw new TypeError(`Unknown setting: ${key}`);
+		if (key === 'codeLanguage') {
+			if (value !== null && value !== 'javascript') throw new TypeError('codeLanguage must be javascript or null');
+			continue;
+		}
 		if (typeof value !== typeof DEFAULT_SETTINGS[key]) throw new TypeError(`Invalid setting: ${key}`);
 		if (typeof value === 'number' && !Number.isFinite(value)) throw new TypeError(`Invalid number: ${key}`);
 	}
@@ -52,6 +56,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	const root = document.createElement('div');
 	root.className = 'croq-mirror';
 	container.append(root);
+	const language = options.codeLanguage === null ? plainLanguage : javascriptLanguage;
 	let view, client, observer, timer, destroyed = false;
 	let settings = { ...DEFAULT_SETTINGS, ...options };
 	let version      = 0;
@@ -93,17 +98,17 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		mounted.delete(container);
 	}
 	try {
-		client = new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
+		client = language.createAnalysisClient();
 		await client.ready;
-		const owner = {
-			_res: { ...RESOURCES, editorPhrase: { ...LANGUAGES[settings.language].editorPhrase } },
-			executeCommand(command) {
-				api.setSettings({ fontSize: Math.min(64, Math.max(10, settings.fontSize + (command === 'fontSizePlus' ? 2 : -2))) });
+		view = new Editor({
+			language,
+			phrases: { ...LANGUAGES[settings.language].editorPhrase },
+			onFontSizeChange(delta) {
+				api.setSettings({ fontSize: Math.min(64, Math.max(10, settings.fontSize + delta)) });
 			},
-		};
-		view = new Editor(owner, root);
+		}, root);
 		const cm = view.getComponent();
-		view.updateAutoComplete(initialDefinitions);
+		view.setDefinitions(initialDefinitions);
 		const state = () => ({
 			version,
 			readOnly : settings.readOnly,
@@ -113,28 +118,11 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		});
 
 		function setFormatState() {
-			view._autoFormat = settings.autoFormat && settings.formatting && !loading && !programmatic && !composing;
-		}
-
-		function setLint() {
-			cm.setOption('lint', settings.diagnostics ? {
-				selfContain: true,
-				options: { ...RESOURCES.jsHintOpt, indent: 1 },
-				getAnnotations(text, options) {
-					const lint = settings.language === 'ja' ? lintJa : lintEn;
-					lint(text, options);
-					return (lint.errors || []).filter(e => e && e.line > 0).map(e => ({
-						message  : e.reason,
-						severity : e.code?.startsWith('W') ? 'warning' : 'error',
-						from     : CodeMirror.Pos(e.line - 1, Math.max(0, e.character - 1)),
-						to       : CodeMirror.Pos(e.line - 1, Math.max(1, e.character)),
-					}));
-				},
-			} : false);
+			view.autoFormatEnabled(settings.autoFormat && settings.formatting && !loading && !programmatic && !composing);
 		}
 
 		function applySettings() {
-			view._completion = settings.completion;
+			view.completionEnabled(settings.completion);
 			if (!settings.completion || settings.disabled || settings.readOnly) cm.closeHint?.();
 			setFormatState();
 			view.autoIndentEnabled(settings.autoIndent);
@@ -150,7 +138,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			if (settings.disabled) cm.getInputField().blur();
 			cm.setOption('phrases', { ...LANGUAGES[settings.language].editorPhrase });
 			view.functionLineNumberEnabled(settings.analysis && settings.functionLineNumbers);
-			setLint();
+			view.setDiagnostics(settings.diagnostics
+				? (text, options) => language.diagnostics(text, settings.language, options)
+				: null);
 			view.refresh(true);
 		}
 
@@ -166,9 +156,10 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		async function requestAnalysis() {
 			assertAlive();
 			const result = await client.request(cm.getValue(), version);
+			if (result === null) return null;
 			if (!destroyed && result.version === version && settings.analysis) {
 				analysis = structuredClone(result);
-				view.setCodeStructureData(result);
+				view.setPresentation(language.presentation(result));
 				emit('analysis', result);
 			}
 			return structuredClone(result);
@@ -181,7 +172,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		cm.on('change', (_cm, change) => {
 			version++;
 			analysis = null;
-			view.setCodeStructureData({});
+			view.setPresentation();
 			clearMarkers();
 			schedule();
 			if (!loading) emit('change', { origin: 'edit', source: change.origin, version, text: cm.getValue() });
@@ -200,12 +191,12 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			setFormatState();
 			clearTimeout(timer);
 			cm.closeHint?.();
-			view._elem.classList.add('ime');
+			view.composing(true);
 		}, { signal: abort.signal });
 		root.addEventListener('compositionend', () => {
 			composing = false;
 			setFormatState();
-			view._elem.classList.remove('ime');
+			view.composing(false);
 			schedule();
 		}, { signal: abort.signal });
 		// Search dialogs may still receive keyboard commands while the document is read-only.
@@ -286,11 +277,14 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			setSettings(patch) {
 				assertAlive();
 				validate(patch);
+				if ('codeLanguage' in patch && patch.codeLanguage !== settings.codeLanguage) {
+					throw new TypeError('codeLanguage can only be selected when creating an editor');
+				}
 				settings = { ...settings, ...patch };
 				if (!settings.analysis) {
 					clearTimeout(timer);
 					analysis = null;
-					view.setCodeStructureData({});
+					view.setPresentation();
 				}
 				applySettings();
 				if (settings.analysis) schedule();
@@ -301,7 +295,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				assertAlive();
 				if (!Array.isArray(defs)) throw new TypeError('definitions must be an array');
 				cm.closeHint?.();
-				view.updateAutoComplete(structuredClone(defs));
+				view.setDefinitions(structuredClone(defs));
 			},
 			getAnalysis() {
 				assertAlive();
@@ -330,8 +324,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 					return;
 				}
 				if (command === 'format' && !settings.formatting) return;
-				if (command === 'complete') view._complete(cm, view._ternServer);
-				else view[command]();
+				view[command]();
 			},
 			focus() {
 				assertAlive();
@@ -441,14 +434,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			getFunctionLineNumber(line) {
 				assertAlive();
 				if (!Number.isInteger(line) || line < 0 || line > cm.lastLine()) throw new RangeError('Invalid line');
-				let number = 0,
-					start = 0;
-				for (const boundary of analysis?.fnStarts || []) {
-					if (boundary > line) break;
-					number++;
-					start = boundary;
-				}
-				return [number, line - start + 1];
+				return view.getSectionLineNumber(line);
 			},
 			getCodeMirror() {
 				assertAlive();

@@ -65,13 +65,15 @@ const tern = scope.tern;
 }
 
 async function buildJavaScript() {
-	await copyDirectory(join(root, 'src/lib'), stage);
-	await copyFileIfChanged(join(root, 'src/index.js'), join(stageRoot, 'index.js'));
+	for (const file of await readdir(join(root, 'src'))) {
+		if (file.endsWith('.js')) await copyFileIfChanged(join(root, 'src', file), join(stageRoot, file));
+	}
+	await copyDirectory(join(root, 'src/lang'), join(stageRoot, 'lang'));
 	await copyDirectory(join(root, 'src/res'), join(stageRoot, 'res'));
 	await bundle({
 		entryPoints  : {
 			'croq-mirror'    : join(stageRoot, 'index.js'),
-			'analysis-worker': join(stage, 'analysis-worker.js'),
+			'analysis-worker': join(stageRoot, 'lang/js/analysis-worker.js'),
 		},
 		outdir       : out,
 		outExtension : { '.js': '.min.js' },

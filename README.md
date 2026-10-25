@@ -94,7 +94,8 @@ Use `setDefinitions` to change additional definitions after initialization.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `language` | `'ja'` | `'ja'` or `'en'` |
+| `language` | `'en'` | UI and diagnostic locale: `'ja'` or `'en'` |
+| `codeLanguage` | `'javascript'` | Programming language: `'javascript'` or `null` for plain text; selected at creation |
 | `fontFamily` | `monospace` | CSS font-family value; custom fonts must be provided by the host application |
 | `fontSize` | `16` | 10-64 px |
 | `lineHeight` | `165` | Positive percentage |
@@ -112,6 +113,27 @@ Use `setDefinitions` to change additional definitions after initialization.
 | `disabled` | `false` | Stops user interaction; preserves the read-only setting when re-enabled |
 
 Unknown setting names, invalid types, and out-of-range values throw errors. Settings are not persisted.
+`codeLanguage` is independent of the UI locale. Omitting it retains JavaScript;
+explicit `null` selects CodeMirror's `text/plain` (internal `null`) mode.
+Changing `codeLanguage` through `setSettings` throws; recreate the editor to change it.
+
+```js
+const editor = await createEditor(container, { codeLanguage: null });
+// Plain text, English UI. Add language: 'ja' for a Japanese UI.
+```
+
+Plain text retains editing, undo/redo, search, and ordinary line numbers. It does
+not create an analysis worker or completion engine. Diagnostics, formatting,
+completion, structural decorations and per-function numbering have no effect,
+even if their settings are true. Settings retain the requested values.
+`getAnalysis()` and `await analyzeNow()` return `null`; no analysis events are
+emitted. `setDefinitions()` accepts but does not use definitions in plain text.
+Automatic bracket insertion and matching are disabled in this mode.
+Internally, `src/lang/plain/index.js` implements the complete language interface
+with inert methods, so the core follows the same call paths as JavaScript.
+Analysis scheduling and diagnostic callbacks still run, returning no results;
+no analysis worker or Tern server is created.
+
 Custom automatic formatting is suspended during IME composition. Native IME interaction requires separate verification.
 Trigger completion explicitly with Ctrl-Tab, Ctrl-\\, or `execute('complete')`.
 
@@ -158,7 +180,7 @@ Explicit `analyzeNow()` requests work even when automatic analysis is disabled, 
 
 ## Sources and build
 
-`src/index.js` is the component's public API entry point. `src/lib/` contains internal implementation modules, `src/styles/` the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution.
+`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/lang/js/` contains JavaScript-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
 `src/styles/index.css` imports `variables.css`; both use standard CSS and explicitly scope their rules to the component. The build bundles imports and expands CSS nesting; it adds component selectors only to the CodeMirror dependency styles.

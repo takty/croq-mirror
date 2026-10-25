@@ -5,7 +5,7 @@
  * @version 2021-02-08
  */
 
-import { acorn } from './parser.js';
+import { acorn } from '../../lib/parser.js';
 
 'use strict';
 

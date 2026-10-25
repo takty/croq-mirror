@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze } from '../.build/lib/analyzer.js';
-import { AnalysisClient } from '../src/lib/analysis-client.js';
+import { analyze } from '../.build/lang/js/analyzer.js';
+import { AnalysisClient } from '../src/analysis-client.js';
 
 test('strict and tolerant results retain the existing coordinate contract', () => {
 	const valid = analyze('function outer() {\n const f = () => 1;\n if (f()) { for (let i=0;i<2;i++) {} }\n}');
