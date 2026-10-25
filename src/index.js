@@ -117,6 +117,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 
 		function setLint() {
 			cm.setOption('lint', settings.diagnostics ? {
+				selfContain: true,
 				options: { ...RESOURCES.jsHintOpt, indent: 1 },
 				getAnnotations(text, options) {
 					const lint = settings.language === 'ja' ? lintJa : lintEn;

@@ -48,16 +48,10 @@ const tern = scope.tern;
 		'addon/selection/mark-selection',
 	];
 	for (const path of ADDONS) {
-		let code = await read('codemirror', path + '.js');
-		if (path === 'addon/lint/lint') code = code.replace('document.body.appendChild', 'cm.getWrapperElement().closest(\'.croq-mirror\').appendChild');
-		vendor += wrap(code);
+		vendor += wrap(await read('codemirror', path + '.js'));
 	}
 	for (const file of ['signal', 'tern', 'def', 'comment', 'infer', 'condense']) vendor += wrap(await read('tern', `lib/${file}.js`));
-	let ternAddon = await read('codemirror', 'addon/tern/tern.js');
-	ternAddon = ternAddon.replace('function makeTooltip(x, y, content, cm, className) {', 'function makeTooltip(x, y, content, cm, className) {\n x -= window.pageXOffset; y -= window.pageYOffset;');
-	ternAddon = ternAddon.replace('var pos = cm.cursorCoords();', 'var pos = cm.cursorCoords(null, "window");');
-	ternAddon = ternAddon.replace('document.querySelector(".CodeMirror-hints")', 'container.querySelector(".CodeMirror-hints")');
-	vendor += wrap(ternAddon);
+	vendor += wrap(await read('codemirror', 'addon/tern/tern.js'));
 	for (const [name, symbol] of [
 		['jshint', 'lintEn'],
 		['jshint-ja-edu', 'lintJa'],
