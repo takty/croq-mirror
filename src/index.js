@@ -64,7 +64,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	let loading      = false;
 	let programmatic = false;
 	let composing    = false;
-	let capturing    = false;
 	const listeners = new Map();
 	const abort = new AbortController();
 	const markers = new Map();
@@ -337,79 +336,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			hasFocus() {
 				assertAlive();
 				return cm.hasFocus();
-			},
-			setSimpleView() {
-				assertAlive();
-				const options = {
-					scrollbarStyle : 'null',
-					readOnly       : 'nocursor',
-					styleActiveLine: false,
-					cursorBlinkRate: -1,
-					cursorHeight   : 0,
-					lineWrapping   : false,
-				};
-				const original = {};
-				for (const [key, value] of Object.entries(options)) {
-					original[key] = cm.getOption(key);
-					cm.setOption(key, value);
-				}
-				cm.getWrapperElement().classList.add('simple');
-				return original;
-			},
-			restoreView(original) {
-				assertAlive();
-				for (const [key, value] of Object.entries(original)) cm.setOption(key, value);
-				cm.getWrapperElement().classList.remove('simple');
-			},
-			async captureImage(capture) {
-				assertAlive();
-				if (typeof capture !== 'function') throw new TypeError('capture must be a function');
-				if (capturing) throw new Error('Image capture already in progress');
-				capturing = true;
-				const disabled = settings.disabled;
-				let original;
-				try {
-					original = api.setSimpleView();
-					api.setSettings({ disabled: true });
-					api.setSimpleView();
-					const lh = cm.defaultTextHeight();
-					const height = lh * cm.lineCount() + lh * 0.25;
-					const bounds = cm.getWrapperElement().getBoundingClientRect();
-					const rect = { x: bounds.left | 0, y: bounds.top | 0, width: bounds.width | 0, height: bounds.height | 0 };
-					if (rect.width <= 0 || rect.height <= 0) throw new Error('Editor must be visible for image capture');
-					let canvas = null;
-					for (let top = 0; top <= height; top += lh * 10) {
-						cm.scrollTo(0, top);
-						cm.refresh();
-						await new Promise(resolve => setTimeout(resolve, 200));
-						assertAlive();
-						const { url, scaleFactor } = await capture({ ...rect });
-						assertAlive();
-						if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) throw new TypeError('Invalid capture scaleFactor');
-						if (!canvas) {
-							canvas = document.createElement('canvas');
-							canvas.width = rect.width * scaleFactor;
-							canvas.height = height * scaleFactor;
-						}
-						const image = new Image();
-						image.src = url;
-						await image.decode();
-						assertAlive();
-						canvas.getContext('2d').drawImage(image, 0, cm.getScrollInfo().top * scaleFactor);
-					}
-					return canvas.toDataURL('image/png');
-				} finally {
-					try {
-						if (!destroyed) {
-							api.setSettings({ disabled });
-							if (original) api.restoreView(original);
-							cm.scrollTo(0, 0);
-							view.refresh(true);
-						}
-					} finally {
-						capturing = false;
-					}
-				}
 			},
 			moveTo(position, { focus = true } = {}) {
 				assertAlive();

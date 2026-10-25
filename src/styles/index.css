@@ -129,7 +129,7 @@
 		transition      : 0.25s;
 		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
-	.CodeMirror:not(.simple) &:hover::after {
+	.CodeMirror &:hover::after {
 		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 45%, transparent);
 		transition      : 0.25s;
 	}
@@ -204,7 +204,7 @@
 		height: 100%;
 		pointer-events: auto;
 	}
-	.CodeMirror:not(.simple) &:hover::before {
+	.CodeMirror &:hover::before {
 		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
 }
@@ -269,10 +269,10 @@
 		height: 100%;
 		pointer-events: auto;
 	}
-	.CodeMirror:not(.simple) &:hover::before {
+	.CodeMirror &:hover::before {
 		background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 25%, transparent);
 	}
-	.CodeMirror:not(.simple) &.CodeMirror-function-even {
+	.CodeMirror &.CodeMirror-function-even {
 		&:hover::before {
 			background-color: color-mix(in srgb, var(--croq-mirror-l-purple) 65%, transparent);
 		}

@@ -63,9 +63,6 @@ Initialization failures reject the promise and clean up resources and DOM elemen
 | `focus()` / `blur()` | Focuses or blurs the editor input; `focus()` does nothing when disabled and is allowed when read-only |
 | `hasFocus()` | Returns whether the editor input has focus (not search fields or other component controls) |
 | `getLineCount()` | Returns the number of document lines, including one line for an empty document |
-| `setSimpleView()` | Temporarily hides scrollbars, cursor and active-line styling, disables wrapping and user editing, and returns the original view options |
-| `restoreView(original)` | Restores the options returned by `setSimpleView()` and removes simple-view styling |
-| `captureImage(capture)` | Returns a Promise for a composed PNG data URL, using the host's asynchronous capture callback |
 | `highlightLine(line)` | Highlights a line and returns an ID for clearing it |
 | `clearHighlight(id)` | Clears the specified highlight |
 | `getFunctionLineNumber(line)` | Returns `[functionNumber, lineWithinFunction]`, or `[0, line + 1]` when analysis is unavailable |
@@ -81,9 +78,6 @@ Position APIs use **zero-based lines and UTF-16 columns** as `{line, ch}`. Repla
 `highlightLine` also uses zero-based line numbers. Document changes clear highlights automatically.
 Host document APIs remain available when the editor is read-only or disabled; these settings restrict user interaction.
 
-Simple view is intended for image capture and does not change `getSettings()`. Pass its returned options unchanged to `restoreView()` on the same editor. `setSettings()` can overwrite temporary view options; reapply `setSimpleView()` afterwards if needed, retaining the first snapshot for restoration.
-
-`captureImage` calls `capture({ x, y, width, height })` with viewport coordinates in CSS pixels. The host returns `{ url, scaleFactor }`, where `url` is a decodable image and `scaleFactor` is the positive ratio of image pixels to CSS pixels, consistent throughout the capture. The component handles simple view, disabling interaction, scrolling and composition; the host handles the actual screen capture and clipboard. The editor must be visible and its layout and document must remain unchanged during capture. On success or failure, view options and the previous disabled state are restored and scrolling returns to the top, matching the original image-copy behavior. Concurrent captures on the same editor are rejected. Destruction during capture rejects the operation without restoring the removed editor.
 Editing commands invoked through `execute` do not run in read-only mode. When disabled, all commands and `moveTo` do nothing.
 Operations after destruction throw errors. Do not use a previously obtained CodeMirror instance after destruction.
 

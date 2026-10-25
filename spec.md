@@ -40,11 +40,11 @@ Completion, diagnostics, formatting, and analysis can each be enabled or disable
 The host application is responsible for:
 
 - Loading and saving files, running programs, and exporting
-- Electron integration, window operations, screen capture, and copying images
+- Electron integration and window operations
 - Toolbars, menus, settings screens, dialogs, and output panes
 - Receiving, interpreting, and displaying runtime errors
 - Persisting settings
-- Application-specific clipboard operations, such as clipboard inspection and image copying
+- Application-specific clipboard operations, such as clipboard inspection
 
 UI directly associated with editing, such as completion lists, diagnostics, and search fields, belongs to the component. Keep surrounding application UI outside it wherever possible.
 
@@ -100,7 +100,7 @@ Preserve the current Croqujs automatic formatting behavior as the default.
 - Provide APIs to get and replace selected text.
 - Expose `cut`, `copy`, and `paste` through `execute(command)`, focusing the editor and using `document.execCommand` as in the original editor.
 - Block all three commands when disabled; allow only `copy` when read-only.
-- Leave clipboard inspection, menu state, and image copying to the host.
+- Leave clipboard inspection and menu state to the host.
 
 ## 7. Analysis and exposed results
 

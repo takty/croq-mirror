@@ -50,36 +50,6 @@ try {
 	a.blur();
 	assert(!a.hasFocus() && b.hasFocus(), 'disabled focus and unrelated blur do not steal focus');
 	a.setSettings({ readOnly: false, disabled: false });
-	a.setSettings({ lineWrapping: true });
-	const simpleOptions = { scrollbarStyle: 'null', readOnly: 'nocursor', styleActiveLine: false, cursorBlinkRate: -1, cursorHeight: 0, lineWrapping: false };
-	const cmA = a.getCodeMirror();
-	const beforeSimple = Object.fromEntries(Object.keys(simpleOptions).map(key => [key, cmA.getOption(key)]));
-	const originalView = a.setSimpleView();
-	assert(Object.entries(simpleOptions).every(([key, value]) => cmA.getOption(key) === value) && editorA.classList.contains('simple'), 'simple view applies capture options');
-	assert(a.getSettings().lineWrapping && !a.getSettings().readOnly && !editorB.classList.contains('simple'), 'simple view preserves settings and other editor');
-	a.setSettings({ disabled: true });
-	a.setSimpleView();
-	a.setSettings({ disabled: false });
-	a.restoreView(originalView);
-	assert(Object.entries(beforeSimple).every(([key, value]) => cmA.getOption(key) === value) && !editorA.classList.contains('simple'), 'simple view restores original options after capture sequence');
-	a.setSettings({ lineWrapping: false });
-	const captureFailure = new Error('capture failed');
-	for (const disabled of [false, true]) {
-		a.setSettings({ disabled, readOnly: true, lineWrapping: true });
-		const previousReadOnly = cmA.getOption('readOnly');
-		let failure;
-		try {
-			await a.captureImage(async rect => {
-				assert(rect.width > 0 && rect.height > 0 && a.getState().disabled, 'capture callback receives bounds while disabled');
-				let concurrentRejected = false;
-				try { await a.captureImage(() => {}); } catch { concurrentRejected = true; }
-				assert(concurrentRejected, 'concurrent image capture rejected');
-				throw captureFailure;
-			});
-		} catch (error) { failure = error; }
-		assert(failure === captureFailure && a.getState().disabled === disabled && cmA.getOption('readOnly') === previousReadOnly && cmA.getOption('lineWrapping') && !editorA.classList.contains('simple'), 'capture failure restores view and previous disabled state');
-	}
-	a.setSettings({ disabled: false, readOnly: false, lineWrapping: false });
 	const clipboardCalls = [];
 	const originalExecCommand = document.execCommand;
 	try {
@@ -248,7 +218,7 @@ try {
 	assert(a.getCodeMirror().getWrapperElement().getBoundingClientRect().height === 420, 'container resize');
 	a.destroy();
 	a.destroy();
-	for (const method of ['focus', 'blur', 'hasFocus', 'setSimpleView', 'restoreView', 'getLineCount']) {
+	for (const method of ['focus', 'blur', 'hasFocus', 'getLineCount']) {
 		let rejected = false;
 		try { a[method](); } catch (error) { rejected = error.message === 'Editor destroyed'; }
 		assert(rejected, method + ' rejects after destroy');
