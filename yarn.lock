@@ -491,9 +491,9 @@ __metadata:
     jshint: "npm:2.13.6"
     jshint-ja-edu: "github:takty/jshint-ja-edu"
     klales: "github:takty/klales"
-    postcss: "npm:^8.5.28"
+    postcss: "npm:^8.5.31"
     tern: "npm:0.24.3"
-    vite: "npm:^8.3.4"
+    vite: "npm:^8.3.5"
   languageName: unknown
   linkType: soft
 
@@ -1182,7 +1182,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:^8.5.28, postcss@npm:^8.5.30":
+"postcss@npm:^8.5.30, postcss@npm:^8.5.31":
   version: 8.5.31
   resolution: "postcss@npm:8.5.31"
   dependencies:
@@ -1422,7 +1422,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite@npm:^8.3.4":
+"vite@npm:^8.3.5":
   version: 8.3.5
   resolution: "vite@npm:8.3.5"
   dependencies:
