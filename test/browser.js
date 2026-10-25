@@ -128,10 +128,26 @@ try {
 	const ja = a.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	const en = b.getCodeMirror().getOption('lint').getAnnotations('var x = 1', { esversion: 10, varstmt: true });
 	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');
+	a.loadDocument('function first() {\n\tvar firstValue = 1;\n}\nfunction second() {\n\tvar secondValue = 2;\n}');
+	await a.analyzeNow();
+	for (const functionLineNumbers of [true, false]) {
+		a.setSettings({ functionLineNumbers });
+		a.getCodeMirror().performLint();
+		for (const line of [1, 4]) {
+			const marker = a.getCodeMirror().lineInfo(line).gutterMarkers['CodeMirror-lint-markers'];
+			const box = marker.getBoundingClientRect();
+			assert(marker.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)), 'lint marker receives pointer over function region: ' + functionLineNumbers + ', line ' + line);
+		}
+	}
 	a.loadDocument('const broken = ;');
 	a.getCodeMirror().performLint();
 	const lintMarker = editorA.querySelector('.CodeMirror-lint-marker-multiple') || editorA.querySelector('.CodeMirror-lint-marker');
 	assert(lintMarker, 'lint marker available for tooltip test');
+	const multipleMarker = editorA.querySelector('.CodeMirror-lint-marker-multiple');
+	assert(multipleMarker, 'multiple diagnostics available for hover regression');
+	const overlayBox = multipleMarker.getBoundingClientRect();
+	const markerBox = multipleMarker.parentElement.getBoundingClientRect();
+	assert(['x', 'y', 'width', 'height'].every(key => overlayBox[key] === markerBox[key]), 'multiple diagnostic overlay covers the entire icon');
 	const editorBox = editorA.getBoundingClientRect();
 	const mouseX = editorBox.right - 10, mouseY = editorBox.top + 100;
 	lintMarker.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: mouseX, clientY: mouseY }));

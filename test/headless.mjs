@@ -113,6 +113,24 @@ try {
 		}, sessionId);
 		if (docs.exceptionDetails || docs.result?.value !== true) throw new Error('Built docs check failed: ' + JSON.stringify(docs));
 		console.log('Built docs passed: one editor, worker, read-only, recreate, default font, subdirectory URLs.');
+		const markerPoint = await send('Runtime.evaluate', {
+			expression: `(async () => {
+				const cm = document.querySelector('.CodeMirror').CodeMirror;
+				cm.setValue('function first() {\\n\\tvar value = 1;\\n}');
+				await document.querySelector('#analysis').onclick();
+				cm.performLint();
+				const marker = cm.lineInfo(1).gutterMarkers['CodeMirror-lint-markers'];
+				const box = marker.getBoundingClientRect();
+				return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+			})()`, awaitPromise: true, returnByValue: true,
+		}, sessionId);
+		if (markerPoint.exceptionDetails) throw new Error('Sample lint marker failed: ' + JSON.stringify(markerPoint));
+		await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...markerPoint.result.value }, sessionId);
+		const hover = await send('Runtime.evaluate', {
+			expression: `!!document.querySelector('.CodeMirror-lint-tooltip')?.textContent.trim()`, returnByValue: true,
+		}, sessionId);
+		if (!hover.result?.value) throw new Error('Sample lint tooltip did not appear on mouse hover');
+		console.log('Built docs passed: native mouse hover opens lint tooltip in function line-number mode.');
 		if (process.argv.includes('--screenshot')) {
 			const capture = await send('Page.captureScreenshot', { format: 'png' }, sessionId);
 			await writeFile(resolve(here, `${name}-example.png`), Buffer.from(capture.data, 'base64'));

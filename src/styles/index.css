@@ -172,6 +172,17 @@
 	border-left: 4px solid var(--croq-mirror-color-window);
 }
 
+/* Keep diagnostics above the line-number hit areas and function backgrounds. */
+:where(.croq-mirror) .CodeMirror-gutter-elt:has(> .CodeMirror-lint-marker) {
+	z-index: 5;
+}
+
+/* Align the multiple-diagnostic overlay and its hover area with the icon. */
+:where(.croq-mirror) .CodeMirror-lint-marker > .CodeMirror-lint-marker-multiple {
+	position: absolute;
+	inset: 0;
+}
+
 :where(.croq-mirror) .CodeMirror-activeline-gutter .CodeMirror-linenumber {
 	font-weight: bold;
 	color: var(--croq-mirror-color-text);
@@ -202,6 +213,7 @@
 
 :where(.croq-mirror) .CodeMirror-function-linenumber,
 :where(.croq-mirror) .CodeMirror-function-number {
+	box-sizing: content-box;
 	padding: 0 7px 0 1px;
 	min-width: 20px;
 	white-space: nowrap;

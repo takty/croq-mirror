@@ -13,6 +13,13 @@ button {
 	margin: 4px 2px;
 }
 
+#language,
+#line-numbers {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 12px;
+}
+
 #status {
 	white-space: pre-wrap;
 }

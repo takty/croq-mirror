@@ -13,6 +13,16 @@
 	<h1>croq-mirror</h1>
 	<p>Try the editor using the controls below. These controls belong to this example, not to the editor component.</p>
 	<main>
+		<fieldset id="language">
+			<legend>Component language</legend>
+			<label><input type="radio" name="language" value="en" checked> English</label>
+			<label><input type="radio" name="language" value="ja"> Japanese</label>
+		</fieldset>
+		<fieldset id="line-numbers">
+			<legend>Line numbers</legend>
+			<label><input type="radio" name="line-numbers" value="normal"> Normal</label>
+			<label><input type="radio" name="line-numbers" value="function" checked> Per function</label>
+		</fieldset>
 		<div id="editor" class="container"></div>
 		<button id="undo">Undo</button>
 		<button id="format">Format</button>
