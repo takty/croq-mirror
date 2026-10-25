@@ -62,6 +62,7 @@ Initialization failures reject the promise and clean up resources and DOM elemen
 | `moveTo({line, ch}, {focus = true})` | Moves the cursor, scrolls into view, and optionally focuses the editor |
 | `focus()` / `blur()` | Focuses or blurs the editor input; `focus()` does nothing when disabled and is allowed when read-only |
 | `hasFocus()` | Returns whether the editor input has focus (not search fields or other component controls) |
+| `getLineCount()` | Returns the number of document lines, including one line for an empty document |
 | `setSimpleView()` | Temporarily hides scrollbars, cursor and active-line styling, disables wrapping and user editing, and returns the original view options |
 | `restoreView(original)` | Restores the options returned by `setSimpleView()` and removes simple-view styling |
 | `captureImage(capture)` | Returns a Promise for a composed PNG data URL, using the host's asynchronous capture callback |
@@ -124,6 +125,7 @@ Trigger completion explicitly with Ctrl-Tab, Ctrl-\\, or `execute('complete')`.
 | `selection` | `{ranges: [{anchor, head}, ...]}` |
 | `analysis` | Analysis result described below |
 | `focus`, `blur` | Empty object |
+| `copy`, `cut` | `{text}`: selection at the time of the clipboard event, before cut processing; empty when nothing is selected. This notification does not confirm an OS clipboard write. |
 | `error` | `{message}`, for example when automatic analysis fails |
 
 Event data and analysis results are copied. Changes made by subscribers do not affect internal state.

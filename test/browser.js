@@ -14,6 +14,22 @@ try {
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
 	const editorA = a.getCodeMirror().getWrapperElement();
 	const editorB = b.getCodeMirror().getWrapperElement();
+	for (const [text, count] of [['', 1], ['first\nsecond\n', 3]]) {
+		a.loadDocument(text);
+		assert(a.getLineCount() === count, 'line count includes empty and trailing lines: ' + count);
+	}
+	a.loadDocument('function one() { return 1; }');
+	const clipboardEvents = [];
+	const offCopy = a.on('copy', event => clipboardEvents.push(['copy', event.text]));
+	const offCut = a.on('cut', event => clipboardEvents.push(['cut', event.text]));
+	a.execute('selectAll');
+	for (const type of ['copy', 'cut']) {
+		a.getCodeMirror().getInputField().dispatchEvent(new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: new DataTransfer() }));
+	}
+	assert(clipboardEvents.length === 2 && clipboardEvents.every(([, text]) => text === 'function one() { return 1; }'), 'clipboard events expose selection before cutting');
+	offCopy();
+	offCut();
+	a.loadDocument('function one() { return 1; }');
 	b.focus();
 	const focusEvents = [];
 	const offFocus = a.on('focus', () => focusEvents.push('focus'));
@@ -205,7 +221,7 @@ try {
 	assert(a.getCodeMirror().getWrapperElement().getBoundingClientRect().height === 420, 'container resize');
 	a.destroy();
 	a.destroy();
-	for (const method of ['focus', 'blur', 'hasFocus', 'setSimpleView', 'restoreView']) {
+	for (const method of ['focus', 'blur', 'hasFocus', 'setSimpleView', 'restoreView', 'getLineCount']) {
 		let rejected = false;
 		try { a[method](); } catch (error) { rejected = error.message === 'Editor destroyed'; }
 		assert(rejected, method + ' rejects after destroy');

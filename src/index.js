@@ -192,6 +192,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		cm.on('cursorActivity', () => emit('selection', { ranges: cm.listSelections() }));
 		cm.on('focus', () => emit('focus', {}));
 		cm.on('blur', () => emit('blur', {}));
+		for (const type of ['copy', 'cut']) {
+			cm.on(type, () => emit(type, { text: cm.getSelection() }));
+		}
 		root.addEventListener('compositionstart', () => {
 			composing = true;
 			setFormatState();
@@ -231,6 +234,10 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			getValue() {
 				assertAlive();
 				return cm.getValue();
+			},
+			getLineCount() {
+				assertAlive();
+				return cm.lineCount();
 			},
 			loadDocument(text) {
 				assertAlive();
