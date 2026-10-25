@@ -712,7 +712,7 @@ export class Editor {
 		for (let i = 0; i < flc; i += 1) {
 			this._formatLine(bgn.line + i);
 		}
-		if (curPos !== false) doc.setCursor(curPos);
+		doc.setCursor(curPos);
 	}
 
 	find() {
@@ -735,11 +735,8 @@ export class Editor {
 	lineWrapping(flag) {
 		if (flag === undefined) return this._comp.getOption('lineWrapping');
 		this._comp.setOption('lineWrapping', flag);
-		const cms = [this._elem];
-		for (let cm of cms) {
-			if (flag) cm.classList.add('wordwrap');
-			else cm.classList.remove('wordwrap');
-		}
+		if (flag) this._elem.classList.add('wordwrap');
+		else this._elem.classList.remove('wordwrap');
 	}
 
 	fontFamily(attr) {

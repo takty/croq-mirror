@@ -50,7 +50,7 @@ const tern = scope.tern;
 	for (const path of ADDONS) {
 		vendor += wrap(await read('codemirror', path + '.js'));
 	}
-	for (const file of ['signal', 'tern', 'def', 'comment', 'infer', 'condense']) vendor += wrap(await read('tern', `lib/${file}.js`));
+	for (const file of ['signal', 'tern', 'def', 'comment', 'infer']) vendor += wrap(await read('tern', `lib/${file}.js`));
 	vendor += wrap(await read('codemirror', 'addon/tern/tern.js'));
 	for (const [name, symbol] of [
 		['jshint', 'lintEn'],

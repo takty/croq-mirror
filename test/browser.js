@@ -196,6 +196,17 @@ try {
 	assert(document.querySelector('#a .CodeMirror-hints')?.textContent.includes('customFunction'), 'Tern completion uses additional definitions');
 	assert(!document.querySelector('#b .CodeMirror-hints'), 'completion popup belongs to its editor');
 	a.getCodeMirror().closeHint();
+	a.loadDocument('customFunction(');
+	a.moveTo({ line: 0, ch: 15 });
+	await wait(200);
+	const argHint = document.querySelector('.CodeMirror-Tern-tooltip');
+	assert(argHint?.textContent.includes('value:') && argHint.textContent.includes('string'), 'Tern argument hints retain parameter types');
+	a.loadDocument('const sampleNumber = 42;\nsampleN');
+	a.moveTo({ line: 1, ch: 7 });
+	a.execute('complete');
+	await wait(200);
+	assert(document.querySelector('#a .CodeMirror-Tern-completion-number')?.textContent.includes('sampleNumber'), 'Tern infers number type for completion');
+	a.getCodeMirror().closeHint();
 	const id = a.highlightLine(0);
 	assert(a.getCodeMirror().lineInfo(0).wrapClass.includes('error-line'), 'external line highlighting');
 	a.clearHighlight(id);
