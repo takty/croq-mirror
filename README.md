@@ -16,6 +16,9 @@ Open the URL printed at startup to try an English-language editor and its contro
 The buttons belong to the example application, not to the component.
 `yarn build` generates `dist/` and `docs/`. Serve the entire `dist/` directory over HTTP or HTTPS to use the component without a consumer-side build.
 Serve the modules and worker from the same origin as the consuming page.
+Keep `dist/` in version control so Git dependencies receive the built component.
+Rebuild it with `node build.mjs` before committing component changes. Package archives
+include `dist/`, the package metadata, README, and the root license.
 Load the CSS in the consuming page. If you configure a Content Security Policy, allow the modules, worker, fonts, and inline styles set by the libraries.
 
 ```html

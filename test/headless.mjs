@@ -105,6 +105,8 @@ try {
 				assert(analysis.success && analysis.fnNames.includes('greet'), 'Worker must analyze sample');
 				document.querySelector('#readonly').click();
 				assert(JSON.parse(document.querySelector('#status').textContent).readOnly, 'Read-only control must work');
+				await document.querySelector('#paste').onclick();
+				assert(document.querySelector('#status').textContent.startsWith('Paste is disabled'), 'Paste must report read-only state');
 				await document.querySelector('#recreate').onclick();
 				assert(document.querySelectorAll('.CodeMirror').length === 1, 'Editor must recreate');
 				assert(getComputedStyle(document.querySelector('.CodeMirror')).fontFamily === 'monospace', 'Default editor font must be monospace');
@@ -115,6 +117,18 @@ try {
 		}, sessionId);
 		if (docs.exceptionDetails || docs.result?.value !== true) throw new Error('Built docs check failed: ' + JSON.stringify(docs));
 		console.log('Built docs passed: one editor, worker, read-only, recreate, default font, subdirectory URLs.');
+		const pastePoint = await send('Runtime.evaluate', {
+			expression: `(() => { const box = document.querySelector('#paste').getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; })()`,
+			returnByValue: true,
+		}, sessionId);
+		await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...pastePoint.result.value }, sessionId);
+		await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...pastePoint.result.value }, sessionId);
+		await new Promise(resolve => setTimeout(resolve, 150));
+		const pasteStatus = await send('Runtime.evaluate', {
+			expression: `document.querySelector('#status').textContent`, returnByValue: true,
+		}, sessionId);
+		if (!/^(Editor text changed after Paste\.|No text change detected\.|Paste failed:)/.test(pasteStatus.result?.value)) throw new Error('Paste demo did not report its result');
+		console.log('Built docs Paste button: ' + pasteStatus.result.value);
 		const markerPoint = await send('Runtime.evaluate', {
 			expression: `(async () => {
 				const cm = document.querySelector('.CodeMirror').CodeMirror;

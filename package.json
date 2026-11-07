@@ -6,6 +6,9 @@
 	"private": true,
 	"type": "module",
 	"exports": "./dist/croq-mirror.min.js",
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "node build.mjs && vite build",
 		"docs": "node build.mjs && vite build",

@@ -12,6 +12,24 @@ try {
 	document.querySelector('#language').onchange = () => editor.setSettings({ language: selectedLanguage() });
 	document.querySelector('#line-numbers').onchange = () => editor.setSettings({ functionLineNumbers: functionLineNumbersEnabled() });
 	document.querySelector('#undo').onclick = () => editor.execute('undo');
+	document.querySelector('#paste').onmousedown = event => event.preventDefault();
+	document.querySelector('#paste').onclick = async () => {
+		const settings = editor.getSettings();
+		if (settings.disabled || settings.readOnly) {
+			status.textContent = 'Paste is disabled while the editor is read-only or disabled.';
+			return;
+		}
+		const before = editor.getValue();
+		try {
+			editor.execute('paste');
+			await new Promise(resolve => setTimeout(resolve, 50));
+			status.textContent = editor.getValue() !== before
+				? 'Editor text changed after Paste.'
+				: 'No text change detected. Your browser may block the Paste button. Try Ctrl+V or Command+V in the editor. Pasting identical text may also leave it unchanged.';
+		} catch (error) {
+			status.textContent = 'Paste failed: ' + error.message;
+		}
+	};
 	document.querySelector('#format').onclick = () => editor.execute('format');
 	document.querySelector('#analysis').onclick = async () => {
 		status.textContent = JSON.stringify(await editor.analyzeNow(), null, 2);
