@@ -1,13 +1,19 @@
 {
 	"editorPhrase": {
-		"Search:": "検索:",
-		"Replace:": "置換:",
-		"(Use /re/ syntax for regexp search)": "(/re/と書くと正規表現で検索できます)",
-		"With:": "置換する文字:",
-		"Replace?": "置換しますか？",
-		"Yes": "はい",
-		"No": "いいえ",
-		"All": "すべて",
-		"Stop": "やめる"
+		"Find": "検索",
+		"Replace": "置換後の文字列",
+		"next": "次へ",
+		"previous": "前へ",
+		"all": "すべて選択",
+		"match case": "大文字と小文字を区別",
+		"regexp": "正規表現",
+		"by word": "単語単位",
+		"replace": "置換",
+		"replace all": "すべて置換",
+		"close": "閉じる",
+		"current match": "現在の一致箇所",
+		"on line": "行",
+		"replaced match on line $": "$行目の一致箇所を置換しました",
+		"replaced $ matches": "$件を置換しました"
 	}
 }

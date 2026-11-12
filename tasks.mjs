@@ -1,4 +1,4 @@
-import { watch as nodeWatch } from 'node:fs';
+import { existsSync, watch as nodeWatch } from 'node:fs';
 import { copyFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -104,13 +104,17 @@ export async function processFiles(srcDir, dstDir, filter, transform) {
 
 export function resolvePackageDir(name) {
 	const req = createRequire(import.meta.url);
-	let pkgPath;
 	try {
-		pkgPath = req.resolve(`${name}/package.json`);
+		return path.dirname(req.resolve(`${name}/package.json`));
 	} catch {
-		pkgPath = req.resolve(name);
+		let dir = path.dirname(req.resolve(name));
+		while (!existsSync(path.join(dir, 'package.json'))) {
+			const parent = path.dirname(dir);
+			if (parent === dir) throw new Error(`Package directory not found: ${name}`);
+			dir = parent;
+		}
+		return dir;
 	}
-	return path.dirname(pkgPath);
 }
 
 export function preventOverlap(fn) {

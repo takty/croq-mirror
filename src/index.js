@@ -1,4 +1,6 @@
-import { Editor } from './editor-view.js';
+import { EditorSelection } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { Editor, offsetAt, positionAt } from './editor-view.js';
 import { javascriptLanguage } from './lang/js/index.js';
 import { plainLanguage } from './lang/plain/index.js';
 import english from './res/lang.en.json';
@@ -66,7 +68,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	let composing    = false;
 	const listeners = new Map();
 	const abort = new AbortController();
-	const markers = new Map();
 	let markerId = 0;
 
 	function assertAlive() {
@@ -91,7 +92,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		observer?.disconnect();
 		client?.destroy();
 		view?.destroy();
-		markers.clear();
 		listeners.clear();
 		root.remove();
 		mounted.delete(container);
@@ -101,46 +101,35 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		await client.ready;
 		view = new Editor({
 			language,
-			phrases: { ...LANGUAGES[settings.language].editorPhrase },
+			phrases: LANGUAGES[settings.language].editorPhrase,
+			allowChanges: () => loading || programmatic || (!settings.readOnly && !settings.disabled),
+			onUpdate: handleUpdate,
 			onFontSizeChange(delta) {
 				api.setSettings({ fontSize: Math.min(64, Math.max(10, settings.fontSize + delta)) });
 			},
 		}, root);
-		const cm = view.getComponent();
+		const cm = view.view;
 		view.setDefinitions(initialDefinitions);
 		const state = () => ({
 			version,
 			readOnly : settings.readOnly,
 			disabled : settings.disabled,
-			canUndo  : cm.historySize().undo > 0,
-			canRedo  : cm.historySize().redo > 0,
+			canUndo  : view.historySize().undo > 0,
+			canRedo  : view.historySize().redo > 0,
 		});
 
 		function setFormatState() {
-			view.autoFormatEnabled(settings.autoFormat && settings.formatting && !loading && !programmatic && !composing);
+			view.autoFormat = settings.autoFormat && settings.formatting && !loading && !programmatic && !composing;
 		}
 
 		function applySettings() {
-			view.completionEnabled(settings.completion);
-			if (!settings.completion || settings.disabled || settings.readOnly) cm.closeHint?.();
 			setFormatState();
-			view.autoIndentEnabled(settings.autoIndent);
-			view.fontFamily(settings.fontFamily);
-			view.fontSize(settings.fontSize);
-			view.lineHeight(settings.lineHeight + '%');
-			view.lineWrapping(settings.lineWrapping);
-			view.rulerEnabled(settings.rulers);
-			view.readOnly(settings.readOnly);
-			view.enabled(!settings.disabled);
+			if (settings.disabled) cm.contentDOM.blur();
 			root.inert = settings.disabled;
 			root.setAttribute('aria-disabled', String(settings.disabled));
-			if (settings.disabled) cm.getInputField().blur();
-			cm.setOption('phrases', { ...LANGUAGES[settings.language].editorPhrase });
-			view.functionLineNumberEnabled(settings.analysis && settings.functionLineNumbers);
-			view.setDiagnostics(settings.diagnostics
-				? (text, options) => language.diagnostics(text, settings.language, options)
+			view.setOptions(settings, LANGUAGES[settings.language].editorPhrase, settings.diagnostics
+				? text => language.diagnostics(text, settings.language)
 				: null);
-			view.refresh(true);
 		}
 
 		function schedule() {
@@ -154,7 +143,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		}
 		async function requestAnalysis() {
 			assertAlive();
-			const result = await client.request(cm.getValue(), version);
+			const result = await client.request(cm.state.doc.toString(), version);
 			if (result === null) return null;
 			if (!destroyed && result.version === version && settings.analysis) {
 				analysis = structuredClone(result);
@@ -164,46 +153,51 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			return structuredClone(result);
 		}
 
-		function clearMarkers() {
-			for (const handle of markers.values()) cm.removeLineClass(handle, 'wrap', 'error-line');
-			markers.clear();
+		function handleUpdate(before, transactions) {
+			const transaction = transactions.at(-1);
+			if (!transaction) return;
+			const changed = transaction.docChanged || transaction.isUserEvent('load');
+			const { doc, selection } = transaction.state;
+			if (changed) {
+				version++;
+				analysis = null;
+				schedule();
+				if (!loading) emit('change', { origin: 'edit', source: changeSource(transaction), version, text: doc.toString() });
+			}
+			if (changed && !loading) emit('state', state());
+			if (changed || !selection.eq(before.selection)) {
+				emit('selection', { ranges: selection.ranges.map(({ anchor, head }) => ({
+					anchor: positionAt(doc, anchor), head: positionAt(doc, head),
+				})) });
+			}
 		}
-		cm.on('change', (_cm, change) => {
-			version++;
-			analysis = null;
-			view.setPresentation();
-			clearMarkers();
-			schedule();
-			if (!loading) emit('change', { origin: 'edit', source: change.origin, version, text: cm.getValue() });
-		});
-		cm.on('changes', () => {
-			if (!loading) emit('state', state());
-		});
-		cm.on('cursorActivity', () => emit('selection', { ranges: cm.listSelections() }));
-		cm.on('focus', () => emit('focus', {}));
-		cm.on('blur', () => emit('blur', {}));
+		for (const type of ['focus', 'blur']) {
+			cm.contentDOM.addEventListener(type, () => emit(type, {}), { signal: abort.signal });
+		}
 		for (const type of ['copy', 'cut']) {
-			cm.on(type, () => emit(type, { text: cm.getSelection() }));
+			cm.contentDOM.addEventListener(type, () => emit(type, { text: selectionText() }), { signal: abort.signal, capture: true });
+		}
+		function selectionText() {
+			const { doc, selection } = cm.state;
+			return selection.ranges.map(({ from, to }) => doc.sliceString(from, to)).join('\n');
 		}
 		root.addEventListener('compositionstart', () => {
 			composing = true;
 			setFormatState();
 			clearTimeout(timer);
-			cm.closeHint?.();
-			view.composing(true);
+			view.closeCompletion();
+			view.composing = true;
+			cm.dom.classList.add('ime');
 		}, { signal: abort.signal });
 		root.addEventListener('compositionend', () => {
 			composing = false;
 			setFormatState();
-			view.composing(false);
+			view.composing = false;
+			cm.dom.classList.remove('ime');
 			schedule();
 		}, { signal: abort.signal });
-		// Search dialogs may still receive keyboard commands while the document is read-only.
-		cm.on('beforeChange', (_cm, change) => {
-			if (!loading && !programmatic && (settings.readOnly || settings.disabled)) change.cancel();
-		});
 		observer = new ResizeObserver(() => {
-			if (!destroyed) view.refresh(true);
+			if (!destroyed) view.refresh();
 		});
 		observer.observe(container);
 
@@ -212,7 +206,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			programmatic = true;
 			setFormatState();
 			try {
-				cm.operation(fn);
+				fn();
 			} finally {
 				programmatic = false;
 				setFormatState();
@@ -223,47 +217,52 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		const api = {
 			getValue() {
 				assertAlive();
-				return cm.getValue();
+				return cm.state.doc.toString();
 			},
 			getLineCount() {
 				assertAlive();
-				return cm.lineCount();
+				return cm.state.doc.lines;
 			},
 			loadDocument(text) {
 				assertAlive();
 				loading = true;
 				setFormatState();
 				try {
-					view.value(String(text));
-					clearMarkers();
-					analysis = null;
+					view.loadDocument(String(text));
 				} finally {
 					loading = false;
 					setFormatState();
 				}
-				emit('change', { origin: 'load', version, text: cm.getValue() });
+				emit('change', { origin: 'load', version, text: cm.state.doc.toString() });
 				emit('state', state());
 				schedule();
 			},
 			replaceDocument(text) {
-				edit(() => {
-					const last = cm.lastLine();
-					cm.replaceRange(String(text), { line: 0, ch: 0 }, { line: last, ch: cm.getLine(last).length }, 'api');
-				});
+				edit(() => cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: String(text) }, userEvent: 'api' }));
 			},
 			replaceRange(text, from, to = from) {
-				edit(() => cm.replaceRange(String(text), from, to, 'api'));
+				edit(() => {
+					const start = offsetAt(cm.state.doc, from), end = offsetAt(cm.state.doc, to);
+					cm.dispatch({ changes: { from: Math.min(start, end), to: Math.max(start, end), insert: String(text) }, userEvent: 'api' });
+				});
 			},
 			getSelection() {
 				assertAlive();
-				return cm.getSelection();
+				return selectionText();
 			},
 			setLineSelectionMode(enabled) {
 				assertAlive();
 				view.setLineSelectionMode(enabled);
 			},
 			replaceSelection(text) {
-				edit(() => cm.replaceSelection(String(text), 'around', 'api'));
+				edit(() => {
+					const { state } = cm;
+					const insert = state.toText(String(text));
+					cm.dispatch(state.changeByRange(range => ({
+						changes: { from: range.from, to: range.to, insert },
+						range: EditorSelection.range(range.from, range.from + insert.length),
+					})), { userEvent: 'api' });
+				});
 			},
 			getState() {
 				assertAlive();
@@ -293,7 +292,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			setDefinitions(defs) {
 				assertAlive();
 				if (!Array.isArray(defs)) throw new TypeError('definitions must be an array');
-				cm.closeHint?.();
 				view.setDefinitions(structuredClone(defs));
 			},
 			getAnalysis() {
@@ -331,40 +329,38 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			blur() {
 				assertAlive();
-				cm.getInputField().blur();
+				cm.contentDOM.blur();
 			},
 			hasFocus() {
 				assertAlive();
-				return cm.hasFocus();
+				return cm.hasFocus;
 			},
 			moveTo(position, { focus = true } = {}) {
 				assertAlive();
 				if (settings.disabled) return;
-				cm.setCursor(position);
-				cm.scrollIntoView(position, 32);
+				const anchor = offsetAt(cm.state.doc, position);
+				cm.dispatch({ selection: { anchor }, effects: EditorView.scrollIntoView(anchor, { yMargin: 32 }) });
 				if (focus) cm.focus();
 			},
 			highlightLine(line) {
 				assertAlive();
-				if (!Number.isInteger(line) || line < 0 || line > cm.lastLine()) throw new RangeError('Invalid line');
+				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) throw new RangeError('Invalid line');
 				const id = ++markerId;
-				markers.set(id, cm.addLineClass(line, 'wrap', 'error-line'));
+				view.highlightLine(id, line);
 				return id;
 			},
 			clearHighlight(id) {
 				assertAlive();
-				const handle = markers.get(id);
-				markers.delete(id);
-				if (handle && ![...markers.values()].includes(handle)) cm.removeLineClass(handle, 'wrap', 'error-line');
+				view.clearHighlight(id);
 			},
 			getFunctionLineNumber(line) {
 				assertAlive();
-				if (!Number.isInteger(line) || line < 0 || line > cm.lastLine()) throw new RangeError('Invalid line');
+				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) throw new RangeError('Invalid line');
 				return view.getSectionLineNumber(line);
 			},
 			refresh() {
 				assertAlive();
-				view.refresh(true);
+				view.refresh();
 			},
 			destroy: dispose,
 		};
@@ -376,4 +372,14 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		dispose();
 		throw error;
 	}
+}
+
+function changeSource(transaction) {
+	for (const event of ['api', 'undo', 'redo']) if (transaction.isUserEvent(event)) return event;
+	if (transaction.isUserEvent('format')) return 'format';
+	if (transaction.isUserEvent('input.paste')) return 'paste';
+	if (transaction.isUserEvent('delete.cut')) return 'cut';
+	if (transaction.isUserEvent('input.complete')) return 'complete';
+	if (transaction.isUserEvent('input')) return '+input';
+	if (transaction.isUserEvent('delete')) return '+delete';
 }

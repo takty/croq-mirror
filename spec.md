@@ -14,8 +14,7 @@ The following describes the original extraction phase. For the current standalon
 
 ## 2. Technology and supported environments
 
-- Use CodeMirror 5 for the initial version.
-- Consider migrating to CodeMirror 6 after extraction and integration into Croqujs are complete.
+- Use CodeMirror 6 for the editor view, state, and language extensions.
 - Do not depend on Electron or Node.js runtime APIs.
 - Target desktop Chrome, Edge, Firefox, and Safari.
 - Assume pages are served over HTTP or HTTPS. Direct use through `file://` is not guaranteed.

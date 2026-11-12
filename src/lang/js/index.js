@@ -1,14 +1,32 @@
-import { CodeMirror, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
+import { closeBrackets } from '@codemirror/autocomplete';
+import { javascript, javascriptLanguage as javascriptSyntax } from '@codemirror/lang-javascript';
+import { bracketMatching, HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
+import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
+import { localVariables } from './local-variables.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
 // crosses this boundary; the view applies returned data to its own document/UI.
 export const javascriptLanguage = {
-	mode: 'javascript',
-	modeOptions: { closeBrackets: '()[]\'\'""``' },
-	autoCloseBrackets: true,
-	matchBrackets: true,
+	extensions: [
+		javascript(),
+		javascriptSyntax.data.of({ closeBrackets: { brackets: ['(', '[', "'", '"', '`'] } }),
+		closeBrackets(),
+		bracketMatching(),
+		localVariables,
+		syntaxHighlighting(HighlightStyle.define([
+			{ tag: tags.comment, class: 'cm-comment' },
+			{ tag: [tags.keyword, tags.operator, tags.meta], class: 'cm-keyword' },
+			{ tag: [tags.bool, tags.null, tags.atom, tags.number, tags.string, tags.special(tags.string), tags.regexp], class: 'cm-literal' },
+			{ tag: [tags.definition(tags.variableName), tags.definition(tags.propertyName)], class: 'cm-definition' },
+			{ tag: tags.variableName, class: 'cm-variable' },
+			{ tag: tags.local(tags.variableName), class: 'cm-local-variable' },
+			{ tag: tags.propertyName, class: 'cm-property' },
+			{ tag: tags.invalid, class: 'cm-invalid' },
+		])),
+	],
 
 	createAnalysisClient() {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
@@ -29,8 +47,8 @@ export const javascriptLanguage = {
 		return /\w|\./.test(key) ? { delay: 500, allowShort: key === '.' } : null;
 	},
 
-	createCompletionSession(cm) {
-		return new JavaScriptCompletion(cm);
+	createCompletionSession() {
+		return new JavaScriptCompletion();
 	},
 
 	formatLine(text, { autoIndent, indentWithTabs, tabSize }) {
@@ -85,55 +103,91 @@ export const javascriptLanguage = {
 };
 
 class JavaScriptCompletion {
-	constructor(cm) {
-		this.cm = cm;
-		this.defaults = structuredClone(defaultDefinitions);
+	constructor() {
 		this.setDefinitions([]);
 	}
 
 	setDefinitions(definitions) {
 		this.destroy();
-		this.server = new CodeMirror.TernServer({ defs: this.defaults.concat(definitions) });
+		this.server = new tern.Server({ defs: structuredClone(defaultDefinitions).concat(definitions) });
 	}
 
-	complete({ allowShort }, callback) {
+	request(doc, query, callback) {
 		const server = this.server;
-		if (!server) return callback(null);
-		server.request(this.cm, { type: 'completions', types: true, includeKeywords: true }, (error, data) => {
-			if (server !== this.server || error) return callback(null);
-			const from = data.start, to = data.end;
-			if (from.line !== to.line || (!allowShort && to.ch - from.ch < 3)) return callback(null);
-			const list = data.completions.map(item => ({
-				text: item.name,
-				displayText: item.displayName || item.name,
-				className: typeToIcon(item.type) + (data.guess ? ' CodeMirror-Tern-guess' : ''),
-				data: item,
-			}));
-			callback({ from, to, list });
+		if (!server) return;
+		const files = doc === this.document ? [] : [{ type: 'full', name: 'editor.js', text: doc.toString() }];
+		this.document = doc;
+		server.request({ files, query: { file: 'editor.js', ...query } }, (error, result) => {
+			if (server !== this.server) callback(new Error('Completion session changed'));
+			else callback(error, result);
 		});
 	}
 
-	// Tern's argument-hint renderer is kept behind the adapter for compatibility.
-	updateArgumentHints() {
-		this.server?.updateArgHints(this.cm);
+	complete({ state, pos, allowShort }, callback) {
+		if (!state.selection.main.empty) return callback(null);
+		this.request(state.doc, { type: 'completions', end: pos, types: true, includeKeywords: true }, (error, data) => {
+			if (error || data.start > data.end || data.end !== pos || (!allowShort && data.end - data.start < 3)) {
+				return callback(null);
+			}
+			callback({
+				from: data.start, to: data.end,
+				list: data.completions.map(item => ({
+					text: item.name,
+					displayText: item.displayName || item.name,
+					className: typeToIcon(item.type),
+				})),
+			});
+		});
+	}
+
+	argumentHint(state, pos) {
+		let node = syntaxTree(state).resolveInner(pos, -1);
+		while (node && node.name !== 'ArgList') node = node.parent;
+		if (!node || node.firstChild?.name !== '(' || (node.lastChild?.name === ')' && pos >= node.lastChild.to)) return null;
+		let active = 0;
+		for (let child = node.firstChild; child && child.to <= pos; child = child.nextSibling) {
+			if (child.name === ',') active++;
+		}
+		let hint = null;
+		this.request(state.doc, { type: 'type', preferFunction: true, end: node.from }, (error, data) => {
+			if (error || !data.type?.startsWith('fn(')) return;
+			const { parameters, result } = parseSignature(data.type);
+			hint = { pos: node.from, name: data.exprName || data.name || 'fn', parameters, result, active };
+		});
+		return hint;
 	}
 
 	destroy() {
-		if (!this.server) return;
-		for (const name of Object.keys(this.server.docs)) this.server.delDoc(name);
-		this.server.destroy();
+		this.server?.delFile('editor.js');
 		this.server = null;
+		this.document = null;
 	}
 }
 
-function typeToIcon(type) {
+function parseSignature(type) {
+	const parameters = [];
+	let depth = 0, start = 3;
+	for (let i = start; i < type.length; i++) {
+		const char = type[i];
+		if (depth === 0 && (char === ',' || char === ')')) {
+			const parameter = type.slice(start, i).trim();
+			if (parameter) parameters.push(parameter);
+			if (char === ')') return { parameters, result: type.slice(i + 1) };
+			start = i + 1;
+		} else if ('([{'.includes(char)) depth++;
+		else if (')]}'.includes(char)) depth--;
+	}
+	return { parameters, result: '' };
+}
+
+function typeToIcon(type = '?') {
 	let suffix;
 	if (type === '?') suffix = 'unknown';
 	else if (type === 'number' || type === 'string' || type === 'bool') suffix = type;
-	else if (/^fn\(/.test(type)) suffix = 'fn';
-	else if (/^\[/.test(type)) suffix = 'array';
+	else if (type.startsWith('fn(')) suffix = 'fn';
+	else if (type.startsWith('[')) suffix = 'array';
 	else suffix = 'object';
-	return 'CodeMirror-Tern-completion CodeMirror-Tern-completion-' + suffix;
+	return 'cm-tern-icon cm-tern-' + suffix;
 }
 
 function formatCommentWhitespace(text) {

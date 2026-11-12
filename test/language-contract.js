@@ -7,7 +7,7 @@ export async function runLanguageContractTests(assert) {
 	const ja = javascriptLanguage.diagnostics('var x = 1', 'ja', { esversion: 10, varstmt: true });
 	const en = javascriptLanguage.diagnostics('var x = 1', 'en', { esversion: 10, varstmt: true });
 	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');
-	assert(!plainLanguage.autoCloseBrackets && !plainLanguage.matchBrackets, 'plain language disables bracket insertion and matching');
+	assert(!plainLanguage.extensions.length, 'plain language disables language-specific extensions');
 	const plainClient = plainLanguage.createAnalysisClient();
 	await plainClient.ready;
 	assert(await plainClient.request('text', 1) === null, 'plain analysis client returns no result');
@@ -16,7 +16,7 @@ export async function runLanguageContractTests(assert) {
 	const plainSession = plainLanguage.createCompletionSession();
 	let completed = false;
 	plainSession.setDefinitions([]);
-	plainSession.updateArgumentHints();
+	assert(plainSession.argumentHint() === null, 'plain language has no argument hints');
 	plainSession.complete({}, result => { completed = result === null; });
 	plainSession.destroy();
 	assert(completed, 'plain completion invokes callback with no candidates');
@@ -44,46 +44,47 @@ export async function runLanguageContractTests(assert) {
 	document.body.prepend(root);
 	let disposed = false, definitions;
 	const language = {
-		mode: 'text/plain', modeOptions: {}, autoCloseBrackets: false, matchBrackets: false,
+		extensions: [],
 		presentation: () => ({ canIndent: false, sectionStarts: [], decorations: [] }),
 		completionTrigger: () => null,
 		formatLine: text => ({ text: text.trimEnd().toUpperCase(), indent: false }),
 		createCompletionSession: () => ({
 			setDefinitions: value => { definitions = value; },
-			complete: (_options, callback) => callback({ from: { line: 0, ch: 0 }, to: { line: 0, ch: 3 }, list: [{ text: 'candidate', displayText: 'Generic candidate' }] }),
-			updateArgumentHints() {},
+			complete: (_options, callback) => callback({ from: 0, to: 3, list: [{ text: 'candidate', displayText: 'Generic candidate' }] }),
+			argumentHint: () => null,
 			destroy() { disposed = true; },
 		}),
 	};
 	const view = new Editor({ language, phrases: {}, onFontSizeChange() {} }, root);
 	try {
-		view.autoFormatEnabled(false);
-		view.value('abc\ndef\nghi');
+		const settings = { analysis: true, functionLineNumbers: true, completion: true, fontSize: 16, fontFamily: 'monospace', lineHeight: 165 };
+		const diagnostics = () => [{ from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, severity: 'error', message: 'Generic diagnostic' }];
+		view.setOptions(settings, {}, diagnostics);
+		view.loadDocument('abc\ndef\nghi');
 		view.setDefinitions(['opaque definition']);
 		assert(definitions[0] === 'opaque definition', 'view forwards definitions without interpreting them');
 		view.setPresentation({
 			canIndent: false, sectionStarts: [1],
 			decorations: [{ kind: 'token', from: { line: 1, ch: 0 }, to: { line: 1, ch: 3 }, fill: '#ff0000', stroke: '#000000' }],
 		});
-		view.functionLineNumberEnabled(true);
 		assert(view.getSectionLineNumber(0).join() === '0,1' && view.getSectionLineNumber(2).join() === '1,2', 'view numbers sections from language-neutral data');
-		assert(root.querySelector('.CodeMirror-function-number')?.textContent === '1', 'view renders section start markers');
+		assert(root.querySelector('.cm-function-number')?.textContent === '1', 'view renders section start markers');
 		await new Promise(resolve => setTimeout(resolve, 450));
 		const canvas = root.querySelector('canvas');
 		assert(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value), 'view draws supplied token decoration');
-		view.setDiagnostics(() => [{ from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, severity: 'error', message: 'Generic diagnostic' }]);
-		view.getComponent().performLint();
-		assert(root.querySelector('.CodeMirror-lint-marker-error'), 'view renders generic diagnostics');
-		view.getComponent().setCursor(0, 3);
+		await new Promise(resolve => setTimeout(resolve, 200));
+		assert(root.querySelector('.cm-lint-marker-error'), 'view renders generic diagnostics');
+		view.view.dispatch({ selection: { anchor: 3 } });
 		view.complete();
-		assert(root.querySelector('.CodeMirror-hints')?.textContent.includes('Generic candidate'), 'view displays generic completion candidates');
-		view.getComponent().closeHint();
+		await new Promise(resolve => setTimeout(resolve, 200));
+		assert(root.querySelector('.cm-tooltip-autocomplete')?.textContent.includes('Generic candidate'), 'view displays generic completion candidates');
+		view.closeCompletion();
 		view.format();
-		assert(view.getComponent().getLine(0) === 'ABC', 'view applies language formatting result');
-		view.readOnly(true);
-		view.getComponent().setCursor(1, 3);
+		assert(view.view.state.doc.line(1).text === 'ABC', 'view applies language formatting result');
+		view.setOptions({ ...settings, readOnly: true }, {}, diagnostics);
+		view.view.dispatch({ selection: { anchor: 7 } });
 		view.format();
-		assert(view.getComponent().getLine(1) === 'def', 'read-only blocks language formatting edits');
+		assert(view.view.state.doc.line(2).text === 'def', 'read-only blocks language formatting edits');
 		view.setPresentation();
 		assert(view.getSectionLineNumber(2).join() === '0,3', 'clearing presentation restores absolute numbering');
 	} finally {

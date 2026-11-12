@@ -1,10 +1,7 @@
 // A complete, inert implementation of the language interface. This exercises
 // the same coordinator/view paths as a language with syntax-aware services.
 export const plainLanguage = {
-	mode: 'text/plain',
-	modeOptions: {},
-	autoCloseBrackets: false,
-	matchBrackets: false,
+	extensions: [],
 
 	createAnalysisClient() {
 		return {
@@ -22,7 +19,7 @@ export const plainLanguage = {
 		return {
 			setDefinitions() {},
 			complete(_options, callback) { callback(null); },
-			updateArgumentHints() {},
+			argumentHint() { return null; },
 			destroy() {},
 		};
 	},

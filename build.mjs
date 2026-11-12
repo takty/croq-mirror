@@ -1,7 +1,6 @@
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import postcss from 'postcss';
 import { build as bundle, transform } from 'esbuild';
 import { copyDirectory, copyFileIfChanged, resolvePackageDir, writeFileIfChanged } from './tasks.mjs';
 
@@ -29,29 +28,7 @@ export { acorn };
 const scope = { tern: {} };
 const tern = scope.tern;
 `;
-	vendor += wrap(await read('codemirror', 'lib/codemirror.js'));
-	vendor += 'const CodeMirror = scope.CodeMirror;\n';
-	const ADDONS = [
-		'mode/javascript/javascript',
-		'addon/comment/comment',
-		'addon/display/rulers',
-		'addon/dialog/dialog',
-		'addon/edit/matchbrackets',
-		'addon/edit/closebrackets',
-		'addon/hint/show-hint',
-		'addon/lint/lint',
-		'addon/scroll/annotatescrollbar',
-		'addon/search/searchcursor',
-		'addon/search/search',
-		'addon/search/match-highlighter',
-		'addon/selection/active-line',
-		'addon/selection/mark-selection',
-	];
-	for (const path of ADDONS) {
-		vendor += wrap(await read('codemirror', path + '.js'));
-	}
 	for (const file of ['signal', 'tern', 'def', 'comment', 'infer']) vendor += wrap(await read('tern', `lib/${file}.js`));
-	vendor += wrap(await read('codemirror', 'addon/tern/tern.js'));
 	for (const [name, symbol] of [
 		['jshint', 'lintEn'],
 		['jshint-ja-edu', 'lintJa'],
@@ -60,7 +37,7 @@ const tern = scope.tern;
 	}
 	vendor += `const beautify = (function(exports){\n${await read('js-beautify', 'js/lib/beautify.js')}\nreturn exports.js_beautify;\n})({});\n`;
 	const defs = await Promise.all(['ecmascript', 'browser'].map(n => read('tern', `defs/${n}.json`).then(JSON.parse)));
-	vendor += `const defaultDefinitions = ${JSON.stringify(defs)};\nexport { CodeMirror, lintEn, lintJa, beautify, defaultDefinitions };\n`;
+	vendor += `const defaultDefinitions = ${JSON.stringify(defs)};\nexport { tern, lintEn, lintJa, beautify, defaultDefinitions };\n`;
 	await writeFileIfChanged(join(stage, 'vendor.js'), vendor);
 }
 
@@ -88,14 +65,6 @@ async function buildJavaScript() {
 }
 
 async function buildStyle() {
-	let css = '';
-	for (const file of ['lib/codemirror', 'addon/dialog/dialog', 'addon/hint/show-hint', 'addon/lint/lint', 'addon/tern/tern']) css += await read('codemirror', file + '.css');
-	// Scope dependency styles only; our CSS declares its own component scope.
-	const tree = postcss.parse(css);
-	tree.walkRules(rule => {
-		if (rule.parent.type === 'atrule' && /keyframes/.test(rule.parent.name)) return;
-		rule.selectors = rule.selectors.map(s => ':where(.croq-mirror) ' + s);
-	});
 	const styles = await bundle({
 		entryPoints  : [join(root, 'src/styles/index.css')],
 		bundle       : true,
@@ -104,16 +73,18 @@ async function buildStyle() {
 		supported    : { nesting: false },
 		legalComments: 'inline',
 	});
-	css = tree.toString() + styles.outputFiles[0].text;
-	const minifiedCss = await transform(css, { loader: 'css', minify: true, legalComments: 'inline', target: 'es2022' });
+	const minifiedCss = await transform(styles.outputFiles[0].text, { loader: 'css', minify: true, legalComments: 'inline', target: 'es2022' });
 	await writeFileIfChanged(join(out, 'croq-mirror.min.css'), minifiedCss.code);
 }
 
 async function copyLicenses() {
-	for (const name of ['codemirror', 'acorn', 'acorn-loose', 'acorn-walk', 'tern', 'jshint', 'jshint-ja-edu', 'js-beautify']) {
+	for (const name of ['@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language',
+		'@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint', '@codemirror/search',
+		'@lezer/common', '@lezer/highlight', '@lezer/javascript', '@lezer/lr',
+		'@marijn/find-cluster-break', 'crelt', 'style-mod', 'w3c-keyname', 'acorn', 'acorn-loose', 'acorn-walk', 'tern', 'jshint', 'jshint-ja-edu', 'js-beautify']) {
 		const dir = resolvePackageDir(name);
 		for (const file of await readdir(dir)) {
-			if (/^(license|copying)/i.test(file)) await copyFileIfChanged(join(dir, file), join(out, 'licenses', name + '-' + file));
+			if (/^(license|copying)/i.test(file)) await copyFileIfChanged(join(dir, file), join(out, 'licenses', name.replace(/^@/, '').replace('/', '-') + '-' + file));
 		}
 	}
 }

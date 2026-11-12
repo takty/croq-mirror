@@ -15,12 +15,20 @@ const waitFor = async (predicate, message) => {
 // Inspect rendered UI, without retrieving the underlying editor instance.
 const searchLabel = (editor, host) => {
 	editor.execute('find');
-	const dialog = host.querySelector('.CodeMirror-dialog');
-	const label = dialog.textContent;
-	dialog.querySelector('input').dispatchEvent(new KeyboardEvent('keydown', { keyCode: 27, bubbles: true }));
+	const dialog = host.querySelector('.cm-search');
+	const label = dialog.querySelector('input[name="search"]').getAttribute('aria-label');
+	dialog.querySelector('button[name="close"]').click();
 	return label;
 };
-const escape = host => host.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+const escape = host => host.querySelector('.cm-content').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+const mac = /Mac/.test(navigator.platform);
+const mod = mac ? { metaKey: true } : { ctrlKey: true };
+const press = (host, key, modifiers = {}) => host.querySelector('.cm-content').dispatchEvent(
+	new KeyboardEvent('keydown', {
+		key, keyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0,
+		bubbles: true, cancelable: true, ...modifiers,
+	}),
+);
 let a, b;
 try {
 	a = await createEditor(document.querySelector('#a'), { value: 'function one() { return 1; }', language: 'ja', autoFormat: false });
@@ -29,8 +37,8 @@ try {
 	assert(a.getAnalysis().fnNames[0] === 'one' && b.getAnalysis().fnNames[0] === 'two', 'independent analysis');
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
 	assert(!('getCodeMirror' in a), 'public API does not expose editor instance');
-	const editorA = document.querySelector('#a .CodeMirror');
-	const editorB = document.querySelector('#b .CodeMirror');
+	const editorA = document.querySelector('#a .cm-editor');
+	const editorB = document.querySelector('#b .cm-editor');
 	for (const [text, count] of [['', 1], ['first\nsecond\n', 3]]) {
 		a.loadDocument(text);
 		assert(a.getLineCount() === count, 'line count includes empty and trailing lines: ' + count);
@@ -39,13 +47,35 @@ try {
 	const clipboardEvents = [];
 	const offCopy = a.on('copy', event => clipboardEvents.push(['copy', event.text]));
 	const offCut = a.on('cut', event => clipboardEvents.push(['cut', event.text]));
-	a.execute('selectAll');
+	a.focus();
+	press(editorA, 'a', mod);
+	assert(a.getSelection() === a.getValue(), 'select-all shortcut selects the entire document');
+	await waitFor(() => editorA.querySelector('.cm-selectionBackground'), 'selection is rendered');
+	const selectionLayer = editorA.querySelector('.cm-selectionLayer');
+	assert(Number(getComputedStyle(selectionLayer).zIndex) > Number(getComputedStyle(editorA.querySelector('.cm-structure-overlay')).zIndex),
+		'selection highlight is painted above the structure canvas and editor background');
 	for (const type of ['copy', 'cut']) {
-		editorA.querySelector('textarea').dispatchEvent(new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: new DataTransfer() }));
+		editorA.querySelector('.cm-content').dispatchEvent(new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: new DataTransfer() }));
 	}
 	assert(clipboardEvents.length === 2 && clipboardEvents.every(([, text]) => text === 'function one() { return 1; }'), 'clipboard events expose selection before cutting');
 	offCopy();
 	offCut();
+	a.loadDocument('one\ntwo');
+	editorA.querySelector('.cm-content').dispatchEvent(new ClipboardEvent('cut', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() }));
+	assert(a.getValue() === 'one\ntwo', 'cut without a selection leaves the current line intact');
+	a.moveTo({ line: 0, ch: 1 });
+	press(editorA, 'Tab');
+	assert(a.getValue() === 'o\tne\ntwo', 'Tab inserts a tab at the caret');
+	press(editorA, 'd', mod);
+	assert(a.getValue() === 'two', 'legacy delete-line shortcut');
+	press(editorA, 'z', mod);
+	assert(a.getValue().endsWith('\ntwo'), 'keyboard undo restores the deleted line');
+	press(editorA, mac ? 'y' : 'Z', { ...mod, shiftKey: !mac });
+	assert(a.getValue() === 'two', 'legacy keyboard redo removes the line again');
+	press(editorA, mac ? 'f' : 'F', { ...mod, altKey: mac, shiftKey: !mac });
+	const replaceField = editorA.querySelector('.cm-search input[name="replace"]');
+	assert(replaceField && document.activeElement === replaceField, 'legacy replace shortcut focuses the replacement field');
+	editorA.querySelector('.cm-search button[name="close"]').click();
 	a.loadDocument('function one() { return 1; }');
 	b.focus();
 	const focusEvents = [];
@@ -95,7 +125,7 @@ try {
 	const cursorUrls = [];
 	for (const lineSelection of [false, true]) {
 		a.setLineSelectionMode(lineSelection);
-		const cursor = getComputedStyle(editorA.querySelector('.CodeMirror-linenumber')).cursor;
+		const cursor = getComputedStyle(editorA.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility: hidden"])')).cursor;
 		const url = cursor.match(/url\("(data:image\/svg\+xml[^"\n]+)"\)/)?.[1];
 		assert(url && cursor.endsWith('22 8, pointer'), 'embedded cursor and hotspot: ' + lineSelection);
 		const image = new Image();
@@ -112,49 +142,74 @@ try {
 	assert(getComputedStyle(editorA).backgroundColor === 'rgb(18, 52, 86)', 'theme custom properties update at runtime');
 	assert(getComputedStyle(editorB).backgroundColor === 'rgb(253, 253, 249)', 'theme custom properties isolated per editor');
 	themeRoot.style.removeProperty('--croq-mirror-color-editor');
-	a.loadDocument('function first() {\n\tvar firstValue = 1;\n}\nfunction second() {\n\tvar secondValue = 2;\n}');
+	a.loadDocument('function first() {\n\tvar firstValue = 1; console.log(firstValue);\n}\nfunction second() {\n\tvar secondValue = 2;\n}');
 	await a.analyzeNow();
+	const local = editorA.querySelector('.cm-local-reference');
+	assert(local?.textContent === 'firstValue' && getComputedStyle(local).color === 'rgb(83, 122, 31)',
+		'local variable references retain the original green highlight');
+	assert([...editorA.querySelectorAll('.cm-variable')].some(node =>
+		node.textContent === 'console' && getComputedStyle(node).color === 'rgb(0, 83, 99)'),
+		'global variable references retain the original turquoise highlight');
+	const ruler = editorA.querySelector('.cm-croq-rulers');
+	assert([...ruler.children].map(rule => rule.style.getPropertyValue('--ruler-column')).join(',') === '4,8,12' &&
+		[...ruler.children].every(rule => getComputedStyle(rule).borderLeftStyle === 'dashed'),
+		'three dashed rulers mark the original indentation columns');
+	const gutterWidth = () => editorA.querySelector('.cm-gutters').getBoundingClientRect().width;
+	const normalWidth = gutterWidth();
+	const structureLayer = getComputedStyle(editorA.querySelector('.cm-structure-overlay'));
+	const textLayer = getComputedStyle(editorA.querySelector('.cm-content'));
+	assert(getComputedStyle(editorA.querySelector('.cm-scroller')).zIndex === 'auto' &&
+		Number(textLayer.zIndex) > Number(structureLayer.zIndex), 'source text is painted above the structure canvas');
 	for (const functionLineNumbers of [true, false]) {
 		a.setSettings({ functionLineNumbers });
-		await waitFor(() => editorA.querySelectorAll('.CodeMirror-lint-marker-warning').length === 2, 'function diagnostics did not render');
-		for (const [index, marker] of [...editorA.querySelectorAll('.CodeMirror-lint-marker-warning')].entries()) {
+		assert(gutterWidth() === normalWidth, 'gutter width is stable when switching line-number modes: ' + functionLineNumbers);
+		const strip = getComputedStyle(editorA.querySelector('.cm-gutters'), '::after');
+		assert(strip.backgroundImage.includes('repeating-linear-gradient') === functionLineNumbers,
+			'only per-function mode displays the striped gutter edge: ' + functionLineNumbers);
+		await waitFor(() => editorA.querySelectorAll('.cm-lint-marker-warning').length === 2, 'function diagnostics did not render');
+		for (const [index, marker] of [...editorA.querySelectorAll('.cm-lint-marker-warning')].entries()) {
 			const line = [1, 4][index];
 			const box = marker.getBoundingClientRect();
 			assert(marker.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)), 'lint marker receives pointer over function region: ' + functionLineNumbers + ', line ' + line);
 		}
 	}
+	a.loadDocument('function longFunction() {\n' + '\n'.repeat(999) + '}');
+	await a.analyzeNow();
+	const longWidth = gutterWidth();
+	a.setSettings({ functionLineNumbers: true });
+	assert(longWidth > normalWidth && gutterWidth() === longWidth, 'both gutters reserve the same width for four-digit numbers');
+	a.setSettings({ functionLineNumbers: false });
 	a.loadDocument('const broken = ;');
-	await waitFor(() => editorA.querySelector('.CodeMirror-lint-marker-error'), 'syntax diagnostics did not render');
-	const lintMarker = editorA.querySelector('.CodeMirror-lint-marker-multiple') || editorA.querySelector('.CodeMirror-lint-marker');
-	assert(lintMarker, 'lint marker available for tooltip test');
-	const multipleMarker = editorA.querySelector('.CodeMirror-lint-marker-multiple');
-	assert(multipleMarker, 'multiple diagnostics available for hover regression');
-	const overlayBox = multipleMarker.getBoundingClientRect();
-	const markerBox = multipleMarker.parentElement.getBoundingClientRect();
-	assert(['x', 'y', 'width', 'height'].every(key => overlayBox[key] === markerBox[key]), 'multiple diagnostic overlay covers the entire icon');
-	const editorBox = editorA.getBoundingClientRect();
-	const mouseX = editorBox.right - 10, mouseY = editorBox.top + 100;
-	lintMarker.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: mouseX, clientY: mouseY }));
-	const lintTooltip = editorA.querySelector('.CodeMirror-lint-tooltip');
-	assert(lintTooltip?.parentElement === editorA, 'lint tooltip uses selfContain without patch');
-	assert(getComputedStyle(lintTooltip).position === 'fixed', 'lint tooltip retains viewport positioning');
-	document.dispatchEvent(new MouseEvent('mousemove', { clientX: mouseX, clientY: mouseY }));
-	const tooltipBox = lintTooltip.getBoundingClientRect();
-	assert(Math.abs(tooltipBox.top - Math.max(0, mouseY - lintTooltip.offsetHeight - 5)) < 1, 'lint tooltip follows pointer coordinates');
-	const hit = document.elementFromPoint(Math.max(editorBox.right + 1, tooltipBox.left + 1), tooltipBox.top + 5);
-	assert(hit && lintTooltip.contains(hit), 'lint tooltip is visible beyond editor boundary');
-	lintMarker.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
-	await wait(650);
-	assert(!lintTooltip.isConnected, 'lint tooltip removed on mouseout');
+	await waitFor(() => editorA.querySelector('.cm-lint-marker-error'), 'syntax diagnostics did not render');
+	const lintMarker = editorA.querySelector('.cm-lint-marker-error');
+	lintMarker.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+	await waitFor(() => editorA.querySelector('.cm-tooltip-lint li'), 'gutter hover opens the diagnostic tooltip');
+	const lintTooltip = editorA.querySelector('.cm-tooltip-lint');
+	assert(lintTooltip.querySelectorAll('li').length > 1, 'tooltip includes every diagnostic on the line');
+	window.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+	await waitFor(() => !lintTooltip.isConnected, 'lint tooltip removed when pointer leaves');
 	a.loadDocument('function one() { return 1; }');
-	assert(searchLabel(a, editorA).includes('検索:'), 'Japanese search uses language resources');
-	assert(searchLabel(b, editorB).includes('Search:'), 'English search uses language resources');
+	assert(searchLabel(a, editorA).includes('検索'), 'Japanese search uses language resources');
+	assert(searchLabel(b, editorB).includes('Find'), 'English search uses language resources');
 	a.setSettings({ language: 'en' });
-	assert(searchLabel(a, editorA).includes('Search:'), 'language resources switch at runtime');
+	assert(searchLabel(a, editorA).includes('Find'), 'language resources switch at runtime');
 	a.setSettings({ language: 'ja' });
-	assert(searchLabel(a, editorA).includes('検索:') && searchLabel(b, editorB).includes('Search:'), 'language resources remain independent');
+	assert(searchLabel(a, editorA).includes('検索') && searchLabel(b, editorB).includes('Find'), 'language resources remain independent');
 	a.setSettings({ lineWrapping: true, fontSize: 22 });
-	assert(!b.getSettings().lineWrapping && !editorB.classList.contains('CodeMirror-wrap') && b.getSettings().fontSize === 16, 'settings isolated');
+	assert(editorA.querySelector('.cm-lineWrapping'), 'wrapping applies to the configured editor');
+	assert(!b.getSettings().lineWrapping && !editorB.querySelector('.cm-lineWrapping') && b.getSettings().fontSize === 16, 'settings isolated');
+	a.loadDocument('apple apple');
+	a.execute('replace');
+	const searchPanel = editorA.querySelector('.cm-search');
+	const searchInput = searchPanel.querySelector('input[name="search"]');
+	const replacement = searchPanel.querySelector('input[name="replace"]');
+	assert(document.activeElement === replacement, 'replace focuses the replacement field');
+	searchInput.value = 'apple';
+	replacement.value = 'pear';
+	replacement.dispatchEvent(new Event('change', { bubbles: true }));
+	searchPanel.querySelector('button[name="replaceAll"]').click();
+	assert(a.getValue() === 'pear pear', 'search panel can replace all matches');
+	searchPanel.querySelector('button[name="close"]').click();
 	let origin;
 	a.on('change', event => origin = event.origin);
 	a.loadDocument('const old = 1;');
@@ -174,7 +229,7 @@ try {
 	latest.fnNames.push('mutated');
 	assert(!a.getAnalysis().fnNames.includes('mutated'), 'analysis result detached from internal state');
 	a.setSettings({ analysis: false, functionLineNumbers: true });
-	assert(a.getAnalysis() === null && editorA.querySelector('.CodeMirror-linenumber')?.textContent === '1', 'analysis disabled restores ordinary line numbers');
+	assert(a.getAnalysis() === null && editorA.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility: hidden"])')?.textContent === '1', 'analysis disabled restores ordinary line numbers');
 	const once = await a.analyzeNow();
 	assert(once.fnNames[0] === 'newest' && a.getAnalysis() === null, 'explicit analysis works without enabling automatic display');
 	a.setSettings({ readOnly: true, disabled: true });
@@ -188,19 +243,19 @@ try {
 	a.moveTo({ line: 0, ch: 7 });
 	a.execute('complete');
 	await wait(200);
-	assert(document.querySelector('#a .CodeMirror-hints')?.textContent.includes('customFunction'), 'Tern completion uses additional definitions');
-	assert(!document.querySelector('#b .CodeMirror-hints'), 'completion popup belongs to its editor');
+	assert(document.querySelector('#a .cm-tooltip-autocomplete')?.textContent.includes('customFunction'), 'Tern completion uses additional definitions');
+	assert(!document.querySelector('#b .cm-tooltip-autocomplete'), 'completion popup belongs to its editor');
 	escape(editorA);
 	a.loadDocument('customFunction(');
 	a.moveTo({ line: 0, ch: 15 });
 	await wait(200);
-	const argHint = document.querySelector('.CodeMirror-Tern-tooltip');
+	const argHint = document.querySelector('.cm-tern-arguments');
 	assert(argHint?.textContent.includes('value:') && argHint.textContent.includes('string'), 'Tern argument hints retain parameter types');
 	a.loadDocument('const sampleNumber = 42;\nsampleN');
 	a.moveTo({ line: 1, ch: 7 });
 	a.execute('complete');
 	await wait(200);
-	assert(document.querySelector('#a .CodeMirror-Tern-completion-number')?.textContent.includes('sampleNumber'), 'Tern infers number type for completion');
+	assert(document.querySelector('#a .cm-tooltip-autocomplete li:has(.cm-tern-number)')?.textContent.includes('sampleNumber'), 'Tern infers number type for completion');
 	escape(editorA);
 	const id = a.highlightLine(0);
 	assert(editorA.querySelector('.error-line'), 'external line highlighting');
@@ -226,6 +281,11 @@ try {
 	await waitFor(() => a.getValue().includes('; '), 'native input did not update document');
 	a.moveTo({ line: 1, ch: 0 });
 	assert(a.getValue().includes('x = 1'), 'automatic formatting on leaving edited line');
+	const content = editorA.querySelector('.cm-content');
+	content.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+	assert(editorA.classList.contains('ime'), 'composition activates the IME state');
+	content.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+	assert(!editorA.classList.contains('ime'), 'composition end clears the IME state');
 	document.querySelector('#a').style.height = '420px';
 	await wait(100);
 	assert(editorA.getBoundingClientRect().height === 420, 'container resize');
@@ -239,7 +299,7 @@ try {
 	assert(document.querySelector('#a').childNodes.length === 0, 'destroy is idempotent and empties container');
 	a = await createEditor(document.querySelector('#a'), { value: 'const recreated = true;' });
 	assert(a.getValue().includes('recreated') && b.getValue().includes('two'), 'recreate without affecting sibling');
-	assert(a.getSettings().language === 'en' && searchLabel(a, document.querySelector('#a')).includes('Search:'), 'omitted UI language defaults to English');
+	assert(a.getSettings().language === 'en' && searchLabel(a, document.querySelector('#a')).includes('Find'), 'omitted UI language defaults to English');
 	assert(a.getSettings().codeLanguage === 'javascript' && a.getAnalysis().success, 'omitted code language retains JavaScript analysis');
 	b.destroy();
 	a.destroy();
@@ -267,20 +327,20 @@ try {
 		const plain = document.querySelector('#a');
 		assert(a.getSettings().codeLanguage === null, 'explicit null selects plain text without a worker');
 		await wait(600);
-		assert([...plain.querySelectorAll('.CodeMirror-code .CodeMirror-linenumber')].map(node => node.textContent).join(',') === '1,2' && !plain.querySelector('.CodeMirror-lint-marker'), 'plain text uses ordinary numbers without diagnostics');
+		assert([...plain.querySelectorAll('.cm-lineNumbers .cm-gutterElement:not([style*="visibility: hidden"])')].map(node => node.textContent).join(',') === '1,2' && !plain.querySelector('.cm-lint-marker'), 'plain text uses ordinary numbers without diagnostics');
 		assert(a.getAnalysis() === null && await a.analyzeNow() === null, 'plain text has no analysis snapshot');
 		const original = a.getValue();
 		for (const command of ['format', 'complete', 'toggleComment']) a.execute(command);
 		a.setDefinitions([{ '!name': 'unused' }]);
-		assert(a.getValue() === original && !document.querySelector('#a .CodeMirror-hints'), 'language-specific commands leave plain text unchanged');
+		assert(a.getValue() === original && !document.querySelector('#a .cm-tooltip-autocomplete'), 'language-specific commands leave plain text unchanged');
 		a.replaceRange('!', { line: 1, ch: 13 });
 		a.execute('undo');
 		assert(a.getValue() === original, 'plain text retains editing and undo');
 		a.setSettings({ language: 'ja', analysis: true, completion: true, diagnostics: true });
 		await wait(600);
-		assert(searchLabel(a, plain).includes('検索:') && a.getSettings().codeLanguage === null && !document.querySelector('#a .CodeMirror-lint-marker'), 'plain text locale switches independently without producing diagnostics');
+		assert(searchLabel(a, plain).includes('検索') && a.getSettings().codeLanguage === null && !document.querySelector('#a .cm-lint-marker'), 'plain text locale switches independently without producing diagnostics');
 		a.execute('find');
-		assert(document.querySelector('#a .CodeMirror-dialog input'), 'plain text search remains available');
+		assert(document.querySelector('#a .cm-search input'), 'plain text search remains available');
 		let rejected = false;
 		try { a.setSettings({ codeLanguage: 'javascript' }); } catch { rejected = true; }
 		assert(rejected && a.getSettings().codeLanguage === null, 'code language is selected at creation');

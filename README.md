@@ -1,6 +1,6 @@
 # croq-mirror
 
-A CodeMirror 5 editor component extracted from Croqujs.
+A CodeMirror 6 editor component extracted from Croqujs.
 See [spec.md](./spec.md) for the agreed specification. This repository can be built and used independently.
 
 ## Example
@@ -110,7 +110,7 @@ Use `setDefinitions` to change additional definitions after initialization.
 
 Unknown setting names, invalid types, and out-of-range values throw errors. Settings are not persisted.
 `codeLanguage` is independent of the UI locale. Omitting it retains JavaScript;
-explicit `null` selects CodeMirror's `text/plain` (internal `null`) mode.
+explicit `null` selects plain text without JavaScript language extensions.
 Changing `codeLanguage` through `setSettings` throws; recreate the editor to change it.
 
 ```js
@@ -179,7 +179,7 @@ Explicit `analyzeNow()` requests work even when automatic analysis is disabled, 
 `src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/lang/js/` contains JavaScript-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
-`src/styles/index.css` imports `variables.css`; both use standard CSS and explicitly scope their rules to the component. The build bundles imports and expands CSS nesting; it adds component selectors only to the CodeMirror dependency styles.
+`src/styles/index.css` imports `variables.css`; both scope their rules to the component. The build bundles these files into the distributed stylesheet. CodeMirror 6 installs its base styles when an editor is mounted.
 It uses esbuild to bundle and minify JavaScript and minify CSS. Intermediate modules are generated in `.build/`, outside the distribution.
 Each component build replaces `dist/` to remove obsolete output files.
 
@@ -198,7 +198,7 @@ Editor UI text is maintained separately in `src/res/lang.en.json` and `src/res/l
 Default JSHint and formatting options are stored as data in `src/res/defaults.json`.
 The build bundles these resources into the main JavaScript file, so no additional runtime requests or distribution files are required.
 Diagnostic messages remain supplied by the English and Japanese JSHint dependencies.
-Completion and diagnostic popups are also contained within the component. Tern tooltip positioning is adjusted during the build.
+CodeMirror extensions render completion, argument hints, and diagnostic popups within the component.
 
 ```sh
 yarn build         # Build the component and example

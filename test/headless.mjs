@@ -99,7 +99,7 @@ try {
 		const docs = await send('Runtime.evaluate', {
 			expression: `(async () => {
 				const assert = (condition, message) => { if (!condition) throw new Error(message); };
-				assert(document.querySelectorAll('.CodeMirror').length === 1, 'One editor must mount');
+				assert(document.querySelectorAll('.cm-editor').length === 1, 'One editor must mount');
 				await document.querySelector('#analysis').onclick();
 				const analysis = JSON.parse(document.querySelector('#status').textContent);
 				assert(analysis.success && analysis.fnNames.includes('greet'), 'Worker must analyze sample');
@@ -108,8 +108,8 @@ try {
 				await document.querySelector('#paste').onclick();
 				assert(document.querySelector('#status').textContent.startsWith('Paste is disabled'), 'Paste must report read-only state');
 				await document.querySelector('#recreate').onclick();
-				assert(document.querySelectorAll('.CodeMirror').length === 1, 'Editor must recreate');
-				assert(getComputedStyle(document.querySelector('.CodeMirror')).fontFamily === 'monospace', 'Default editor font must be monospace');
+				assert(document.querySelectorAll('.cm-editor').length === 1, 'Editor must recreate');
+				assert(getComputedStyle(document.querySelector('.cm-editor')).fontFamily === 'monospace', 'Default editor font must be monospace');
 				return true;
 			})()`,
 			awaitPromise: true,
@@ -131,19 +131,26 @@ try {
 		console.log('Built docs Paste button: ' + pasteStatus.result.value);
 		const markerPoint = await send('Runtime.evaluate', {
 			expression: `(async () => {
-				const cm = document.querySelector('.CodeMirror').CodeMirror;
-				cm.setValue('function first() {\\n\\tvar value = 1;\\n}');
+				const content = document.querySelector('.cm-content');
+				content.focus();
+				document.execCommand('selectAll');
+				document.execCommand('insertText', false, 'function first() {\\n\\tvar value = 1;\\n}');
 				await document.querySelector('#analysis').onclick();
-				cm.performLint();
-				const marker = cm.lineInfo(1).gutterMarkers['CodeMirror-lint-markers'];
+				let marker;
+				for (let i = 0; i < 100 && !marker; i++) {
+					marker = document.querySelector('.cm-gutter-lint .cm-lint-marker-warning');
+					if (!marker) await new Promise(resolve => setTimeout(resolve, 20));
+				}
+				if (!marker) throw new Error('The sample diagnostic must render');
 				const box = marker.getBoundingClientRect();
 				return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 			})()`, awaitPromise: true, returnByValue: true,
 		}, sessionId);
 		if (markerPoint.exceptionDetails) throw new Error('Sample lint marker failed: ' + JSON.stringify(markerPoint));
 		await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...markerPoint.result.value }, sessionId);
+		await new Promise(resolve => setTimeout(resolve, 450));
 		const hover = await send('Runtime.evaluate', {
-			expression: `!!document.querySelector('.CodeMirror-lint-tooltip')?.textContent.trim()`, returnByValue: true,
+			expression: `!!document.querySelector('.cm-tooltip-lint')?.textContent.trim()`, returnByValue: true,
 		}, sessionId);
 		if (!hover.result?.value) throw new Error('Sample lint tooltip did not appear on mouse hover');
 		console.log('Built docs passed: native mouse hover opens lint tooltip in function line-number mode.');

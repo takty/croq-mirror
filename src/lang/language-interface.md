@@ -31,12 +31,11 @@ Null/empty results mean there is nothing to apply, not a missing service.
 
 | Member | Contract |
 | --- | --- |
-| `mode`, `modeOptions` | CodeMirror mode and mode-specific options applied by the view |
-| `autoCloseBrackets`, `matchBrackets` | CodeMirror bracket behavior selected by the language |
+| `extensions` | CodeMirror extensions for syntax, highlighting, and bracket behavior |
 | `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`; the client owns any worker; request resolves to a snapshot or null |
 | `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error/warning |
 | `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }`; the view owns the debounce timer and menu state |
-| `createCompletionSession(cm)` | Creates per-editor completion state; see below |
+| `createCompletionSession()` | Creates per-editor completion state; see below |
 | `formatLine(text, options)` | Returns `null` to skip, or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, `tabSize` |
 | `presentation(analysis)` | Returns the display data below without mutating the public analysis result |
 
@@ -45,17 +44,16 @@ formatter behavior. The view rejects multiline results. `indent` requests the
 existing CodeMirror indent operation, permitted only when `canIndent` is true.
 
 A completion session provides `setDefinitions(definitions)`,
-`complete({ allowShort }, callback)`, `updateArgumentHints()` and `destroy()`.
-Completion callbacks receive `null` or `{ from, to, list }`, where each item has
-`text`, `displayText`, `className` and optional engine-specific `data`.
-The view uses CodeMirror's common hint UI; it does not interpret Tern types.
+`complete({ state, pos, allowShort }, callback)`, `argumentHint(state, pos)` and `destroy()`.
+Completion callbacks receive `null` or `{ from, to, list }` with UTF-16 document
+offsets and items containing `text`, `displayText`, and optional `className` and `detail`.
+The view uses CodeMirror's completion UI.
 Callbacks from a replaced/destroyed engine must not publish old candidates.
 The view owns and destroys the session. Shared language objects hold no mutable
 per-editor state.
 
-For this first separation, argument hints still use Tern's own renderer through
-`updateArgumentHints()`. This compatibility adapter is explicitly the exception
-to data-only rendering; no Tern object is exposed to `index.js` or `Editor`.
+Argument hints return `null` or `{ pos, name, parameters, result, active }`.
+The view renders that data as a tooltip at the supplied document offset.
 
 ## Presentation data
 
