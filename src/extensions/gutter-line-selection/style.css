@@ -1,0 +1,7 @@
+.cm-editor.cm-gutter-line-selection :is(.cm-lineNumbers, .cm-sectionNumbers) {
+	cursor: var(--croq-gutter-cursor, url("./cursor-right.svg") 22 8, pointer);
+}
+
+.cm-editor.cm-gutter-line-selection.line-selection-mode :is(.cm-lineNumbers, .cm-sectionNumbers) {
+	cursor: var(--croq-gutter-line-selection-cursor, url("./cursor-line.svg") 22 8, pointer);
+}

@@ -1,0 +1,28 @@
+.cm-editor.cm-indent-rulers .cm-scroller {
+	z-index: var(--croq-indent-ruler-scroller-z-index, var(--croq-structure-scroller-z-index, auto));
+}
+
+.cm-editor.cm-indent-rulers .cm-content {
+	z-index: var(--croq-indent-ruler-content-z-index, var(--croq-structure-content-z-index, 1));
+}
+
+.cm-editor.cm-indent-rulers .cm-ruler-overlay {
+	position: var(--croq-indent-ruler-overlay-position, absolute);
+	z-index: var(--croq-indent-ruler-overlay-z-index, 0);
+	overflow: var(--croq-indent-ruler-overlay-overflow, hidden);
+	pointer-events: var(--croq-indent-ruler-pointer-events, none);
+}
+
+.cm-editor.cm-indent-rulers .cm-croq-rulers {
+	position: var(--croq-indent-ruler-container-position, absolute);
+	inset-block: var(--croq-indent-ruler-inset-block, 0);
+	right: var(--croq-indent-ruler-container-right, 0);
+}
+
+.cm-editor.cm-indent-rulers .cm-croq-rulers > span {
+	position: var(--croq-indent-ruler-position, absolute);
+	inset-block: var(--croq-indent-ruler-inset-block, 0);
+	left: calc(var(--croq-indent-ruler-column, var(--ruler-column)) * var(--ruler-character-width));
+	border-left: var(--croq-indent-ruler-width, 2px) var(--croq-indent-ruler-style, dashed)
+		var(--croq-indent-ruler-color, color-mix(in srgb, var(--croq-mirror-l-red, #e61e58) 15%, transparent));
+}

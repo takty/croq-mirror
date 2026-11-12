@@ -5,7 +5,13 @@
 	"license": "MIT",
 	"private": true,
 	"type": "module",
-	"exports": "./dist/croq-mirror.min.js",
+	"exports": {
+		".": "./dist/croq-mirror.min.js",
+		"./structure": "./dist/structure-view.js",
+		"./function-line-numbers": "./dist/function-line-numbers.js",
+		"./gutter-line-selection": "./dist/gutter-line-selection.js",
+		"./indent-rulers": "./dist/indent-rulers.js"
+	},
 	"files": [
 		"dist"
 	],

@@ -1,0 +1,68 @@
+.cm-editor.cm-function-line-numbers.cm-section-mode .cm-gutters::after {
+	content: var(--croq-function-gutter-edge-content, '');
+	width: var(--croq-function-gutter-edge-width, 16px);
+	background-color: var(--croq-function-gutter-edge-color, color-mix(in srgb, var(--croq-mirror-l-purple, #9a74a3) 25%, transparent));
+	background-image: var(--croq-function-gutter-edge-pattern, repeating-linear-gradient(
+		135deg, transparent, transparent var(--croq-function-stripe-width, 8px),
+		var(--croq-function-stripe-color, color-mix(in srgb, var(--croq-mirror-l-purple, #9a74a3) 15%, transparent)) var(--croq-function-stripe-width, 8px),
+		var(--croq-function-stripe-color, color-mix(in srgb, var(--croq-mirror-l-purple, #9a74a3) 15%, transparent)) calc(2 * var(--croq-function-stripe-width, 8px))
+	));
+}
+
+.cm-editor.cm-function-line-numbers.cm-section-mode .cm-gutters:hover::after {
+	background-color: var(--croq-function-gutter-edge-hover-color, color-mix(in srgb, var(--croq-mirror-l-purple, #9a74a3) 45%, transparent));
+}
+
+.cm-editor.cm-function-line-numbers .cm-sectionNumbers {
+	overflow: var(--croq-function-gutter-overflow, visible);
+}
+
+.cm-editor.cm-function-line-numbers .cm-sectionNumbers .cm-gutterElement {
+	position: var(--croq-function-gutter-item-position, relative);
+	min-width: var(--croq-function-gutter-min-width, 33px);
+	padding: var(--croq-function-gutter-item-padding, 0);
+	font-variant-numeric: var(--croq-function-number-font-variant, tabular-nums);
+}
+
+.cm-editor.cm-function-line-numbers :is(.cm-function-number, .cm-croq-line-number) {
+	display: var(--croq-function-number-display, block);
+	padding: var(--croq-function-number-padding, 0 7px 0 4px);
+}
+
+.cm-editor.cm-function-line-numbers .cm-function-number {
+	color: var(--croq-function-number-color, var(--croq-mirror-l-brown, #4e4138));
+}
+
+.cm-editor.cm-function-line-numbers .cm-croq-line-number {
+	color: var(--croq-function-line-color, inherit);
+	text-align: var(--croq-function-line-align, right);
+}
+
+.cm-editor.cm-function-line-numbers .cm-sectionNumbers .cm-gutterElement:has(> .cm-function-even)::before {
+	content: var(--croq-function-alternate-content, '');
+	position: var(--croq-function-alternate-position, absolute);
+	inset: var(--croq-function-alternate-inset, 0 0 0 calc(-1 * var(--croq-mirror-lint-gutter-width, 0px)));
+	z-index: var(--croq-function-alternate-z-index, -1);
+	pointer-events: var(--croq-function-alternate-pointer-events, none);
+	background: var(--croq-function-alternate-background, color-mix(in srgb, var(--croq-mirror-l-lightgray, #e8e8e8) 75%, transparent));
+}
+
+.cm-editor.cm-function-line-numbers .cm-activeLineGutter .cm-function-number {
+	color: var(--croq-function-active-number-color, inherit);
+}
+
+.cm-editor.cm-function-line-numbers .cm-section-scroll-markers {
+	position: var(--croq-function-scroll-track-position, absolute);
+	right: var(--croq-function-scroll-track-right, 0);
+	width: var(--croq-function-scroll-marker-track-width, 10px);
+	pointer-events: var(--croq-function-scroll-track-pointer-events, none);
+	z-index: var(--croq-function-scroll-marker-z-index, 3);
+}
+
+.cm-editor.cm-function-line-numbers .cm-section-scroll-markers > span {
+	position: var(--croq-function-scroll-marker-position, absolute);
+	inset-inline: var(--croq-function-scroll-marker-inset, 2px);
+	aspect-ratio: var(--croq-function-scroll-marker-aspect-ratio, 1);
+	border-radius: var(--croq-function-scroll-marker-radius, 50%);
+	background: var(--croq-function-scroll-marker-color, hsl(40 100% 50% / 75%));
+}

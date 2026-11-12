@@ -46,6 +46,7 @@ async function buildJavaScript() {
 		if (file.endsWith('.js')) await copyFileIfChanged(join(root, 'src', file), join(stageRoot, file));
 	}
 	await copyDirectory(join(root, 'src/lang'), join(stageRoot, 'lang'));
+	await copyDirectory(join(root, 'src/extensions'), join(stageRoot, 'extensions'));
 	await copyDirectory(join(root, 'src/res'), join(stageRoot, 'res'));
 	await bundle({
 		entryPoints  : {
@@ -55,11 +56,28 @@ async function buildJavaScript() {
 		outdir       : out,
 		outExtension : { '.js': '.min.js' },
 		bundle       : true,
+		loader       : { '.svg': 'base64', '.css': 'text' },
 		minify       : true,
 		sourcemap    : true,
 		format       : 'esm',
 		platform     : 'browser',
 		target       : 'es2022',
+		legalComments: 'inline',
+	});
+	await bundle({
+		entryPoints: {
+			'structure-view': join(stageRoot, 'extensions', 'structure-view', 'index.js'),
+			'function-line-numbers': join(stageRoot, 'extensions', 'function-line-numbers', 'index.js'),
+			'gutter-line-selection': join(stageRoot, 'extensions', 'gutter-line-selection', 'index.js'),
+			'indent-rulers': join(stageRoot, 'extensions', 'indent-rulers', 'index.js'),
+		},
+		outdir: out,
+		bundle: true,
+		loader: { '.svg': 'base64', '.css': 'text' },
+		packages: 'external',
+		format: 'esm',
+		platform: 'browser',
+		target: 'es2022',
 		legalComments: 'inline',
 	});
 }

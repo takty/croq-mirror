@@ -174,9 +174,132 @@ Immediately after editing, `getAnalysis()` returns `null`. Worker replies for ol
 When exporting, use the returned `text` rather than calling `getValue()` again after analysis.
 Explicit `analyzeNow()` requests work even when automatic analysis is disabled, but their results are not applied to the display, stored snapshot, or update events.
 
+### Structure display extension
+
+The structure canvas is also available independently as a CodeMirror 6 extension.
+The `croq-mirror/structure` entry point imports CodeMirror packages as external
+dependencies, so use a bundler or an import map resolving the same CodeMirror
+packages as the host editor. It neither parses the document nor performs analysis.
+
+```js
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { structureView, setStructure } from 'croq-mirror/structure';
+
+const view = new EditorView({
+    state: EditorState.create({ doc: 'if (x) {\n  work();\n}', extensions: [structureView] }),
+    parent: document.querySelector('#editor'),
+});
+view.dispatch({ effects: setStructure.of([{
+    kind: 'range', from: { line: 0, ch: 0 }, to: { line: 2, ch: 1 },
+    fill: 'hsla(150, 100%, 35%, 0.15)', spineChars: 3, branchChars: 4, branches: [],
+}]) });
+```
+
+Positions are zero-based `{line, ch}` with UTF-16 columns and exclusive ends.
+Supply ranges as above or tokens as `{kind: 'token', from, to, fill, stroke}`.
+The caller supplies current data in drawing order and is responsible for rejecting
+stale asynchronous analysis results. Treat the supplied array and its contents
+as immutable after dispatch. Document changes or a `load` user event
+clear the display; dispatch `setStructure.of([])` to clear it explicitly. The
+extension owns and removes its canvas when the editor or extension is destroyed.
+
+### Function line-number extension
+
+`croq-mirror/function-line-numbers` provides a standalone CodeMirror extension.
+Like the structure extension, it imports the host's CodeMirror packages as
+external dependencies and does not parse the document.
+
+```js
+import { functionLineNumbers, setSectionStarts, getSectionLineNumber } from 'croq-mirror/function-line-numbers';
+
+// Include functionLineNumbers in the editor's extensions, then supply section starts.
+view.dispatch({ effects: setSectionStarts.of([0, 12]) });
+console.log(getSectionLineNumber(view.state, 13)); // [2, 2]
+```
+
+Section starts are ordered zero-based document lines; the example requires at
+least 14 lines. The result is `[sectionNumber, lineWithinSection]`, with section
+number zero before the first start. Document edits or a `load` user event clear
+the starts; dispatch an empty array to clear them explicitly. The caller must
+reject stale asynchronous analysis results. Removing the extension removes its
+gutter and scroll markers.
+
+### Gutter line-selection extension
+
+`croq-mirror/gutter-line-selection` provides a standalone extension for
+clicking, shift-clicking, and dragging in the gutter to select whole lines.
+Install a gutter separately, for example CodeMirror's `lineNumbers()` or the
+function line-number extension. The host can clear line-selection mode before
+an action by dispatching `setLineSelectionMode.of(false)`.
+
+```js
+import { lineNumbers } from '@codemirror/view';
+import { gutterLineSelection, setLineSelectionMode } from 'croq-mirror/gutter-line-selection';
+
+// Include lineNumbers() and gutterLineSelection in the editor's extensions.
+view.dispatch({ effects: setLineSelectionMode.of(false) });
+```
+
+The extension ignores lint markers and allows selection in read-only editors.
+Setting `EditorView.editable` to false disables gutter interaction. Removing
+the extension removes its event listeners and cursor styling.
+
+### Indentation ruler extension
+
+`croq-mirror/indent-rulers` provides standalone guides at character columns 4,
+8, and 12. Include `indentRulers` in the editor's extensions; removing it
+removes the guides and their stylesheet. The guides follow scrolling, editor
+geometry and font metrics, and are clipped to the visible area and an overlay
+up to 64 character widths wide. As with the component, columns use the editor's default
+character width and are intended for monospaced fonts.
+
+```js
+import { indentRulers } from 'croq-mirror/indent-rulers';
+```
+
+Individual guide columns can be changed through CSS, for example:
+
+```css
+#editor .cm-croq-rulers > span:nth-child(1) { --croq-indent-ruler-column: 2; }
+```
+
+### Extension styling
+
+Each extension keeps its CSS in its own source directory. The build embeds it
+in the extension's JavaScript; installing or removing the extension installs
+or removes its scoped stylesheet automatically. `EditorView.cspNonce` is used
+for the stylesheet when provided. Set custom properties on an editor or an
+ancestor to change its appearance without affecting other editors:
+
+```css
+#editor {
+    --croq-function-number-color: #284f9e;
+    --croq-function-scroll-marker-color: #284f9e;
+    --croq-gutter-cursor: crosshair;
+}
+```
+
+| Extension | Custom properties |
+| --- | --- |
+| Structure | `--croq-structure-scroller-z-index`, `--croq-structure-content-z-index`, `--croq-structure-overlay-z-index`, `--croq-structure-overlay-position`, `--croq-structure-overlay-overflow`, `--croq-structure-overlay-pointer-events`, `--croq-structure-canvas-display`, `--croq-structure-canvas-width`, `--croq-structure-canvas-height` |
+| Function numbers | `--croq-function-number-color`, `--croq-function-active-number-color`, `--croq-function-line-color`, `--croq-function-number-padding`, `--croq-function-number-display`, `--croq-function-number-font-variant`, `--croq-function-line-align`, `--croq-function-gutter-min-width`, `--croq-function-gutter-overflow`, `--croq-function-gutter-item-position`, `--croq-function-gutter-item-padding` |
+| Function gutter edge | `--croq-function-gutter-edge-content`, `--croq-function-gutter-edge-width`, `--croq-function-gutter-edge-color`, `--croq-function-gutter-edge-hover-color`, `--croq-function-gutter-edge-pattern`, `--croq-function-stripe-width`, `--croq-function-stripe-color` |
+| Function highlighting | `--croq-function-alternate-background`, `--croq-function-alternate-content`, `--croq-function-alternate-position`, `--croq-function-alternate-inset`, `--croq-function-alternate-z-index`, `--croq-function-alternate-pointer-events`, `--croq-function-lint-gutter-width` (component), `--croq-mirror-lint-gutter-width` (standalone) |
+| Function scroll markers | `--croq-function-scroll-marker-track-width`, `--croq-function-scroll-track-position`, `--croq-function-scroll-track-right`, `--croq-function-scroll-track-pointer-events`, `--croq-function-scroll-marker-inset`, `--croq-function-scroll-marker-radius`, `--croq-function-scroll-marker-color`, `--croq-function-scroll-marker-position`, `--croq-function-scroll-marker-aspect-ratio`, `--croq-function-scroll-marker-z-index` |
+| Gutter selection | `--croq-gutter-cursor`, `--croq-gutter-line-selection-cursor` (complete CSS `cursor` values) |
+| Indentation rulers | `--croq-indent-ruler-column` (unitless character column), `--croq-indent-ruler-width`, `--croq-indent-ruler-style`, `--croq-indent-ruler-color`, `--croq-indent-ruler-scroller-z-index`, `--croq-indent-ruler-content-z-index`, `--croq-indent-ruler-overlay-position`, `--croq-indent-ruler-overlay-z-index`, `--croq-indent-ruler-overlay-overflow`, `--croq-indent-ruler-pointer-events`, `--croq-indent-ruler-container-position`, `--croq-indent-ruler-container-right`, `--croq-indent-ruler-position`, `--croq-indent-ruler-inset-block` |
+
+Defaults are specified in each extension's `style.css`, including fallbacks to
+the component's existing color variables. These properties can be changed at
+runtime; changing layout or pointer-event properties may affect functionality.
+Structure shapes are painted on a canvas; their fill and stroke colors are
+supplied in the structure data rather than through CSS. Positions calculated
+by the extensions are applied directly and are not CSS custom properties.
+
 ## Sources and build
 
-`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/lang/js/` contains JavaScript-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, `src/assets/` assets inherited from Croqujs, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
+`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/extensions/` contains the structure display, function line-number, gutter line-selection, and indentation ruler extensions. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` contains JavaScript-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
 `src/styles/index.css` imports `variables.css`; both scope their rules to the component. The build bundles these files into the distributed stylesheet. CodeMirror 6 installs its base styles when an editor is mounted.
@@ -188,10 +311,11 @@ The distribution contains:
 - `croq-mirror.min.js`: the editor and its dependencies
 - `analysis-worker.min.js`: the analysis worker and its parser dependencies
 - `croq-mirror.min.css`: the combined, scoped editor styles
+- `structure-view.js`, `function-line-numbers.js`, `gutter-line-selection.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
 - JavaScript source maps for debugging; these are not required at runtime
 - `licenses/`: third-party licenses
 
-Keep the worker beside the main JavaScript file when deploying. Cursor SVGs remain editable in `src/assets/` and are automatically embedded as data URLs in the built CSS; no separate cursor files are distributed.
+Keep the worker beside the main JavaScript file when deploying. Cursor SVGs remain editable in `src/extensions/gutter-line-selection/` and are embedded as data URLs in the extension's JavaScript; no separate cursor files are distributed.
 No font files or `@font-face` declarations are bundled. The host application can load its own fonts and select them using `fontFamily`; search input fonts can be set with `--croq-mirror-font-console` on `.croq-mirror`.
 English and Japanese JSHint implementations are retained as separate functions. CodeMirror styles and the theme are scoped to the component root.
 Editor UI text is maintained separately in `src/res/lang.en.json` and `src/res/lang.ja.json`.

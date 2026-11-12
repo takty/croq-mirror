@@ -15,7 +15,14 @@ modules live in `src/lang/js/`, with the inert implementation in `src/lang/plain
 - Language module: syntax rules, diagnostics, completion engine and definitions,
   formatting rules, and conversion of analysis into presentation data.
 - `Editor`: user events, disabled/read-only/IME guards, applying edits, completion
-  menus, diagnostics display, canvas drawing and section line numbers.
+  menus and diagnostics display.
+- `structureView`: an independent CodeMirror extension that receives decorations
+  and draws them on a canvas; it does not obtain or interpret analysis results.
+- `functionLineNumbers`: an independent CodeMirror extension that receives section
+  start lines and renders numbering and scroll markers without performing analysis.
+- `gutterLineSelection`: an independent CodeMirror extension that handles gutter
+  selection gestures and the line-selection cursor.
+- `indentRulers`: an independent CodeMirror extension for indentation guides.
 
 The language module receives no `Editor` instance or private fields. It must not
 replace document text; the view applies formatting results with its editing guards.
@@ -79,7 +86,7 @@ coordinate conventions.
 ```
 
 Decorations are drawn in array order. The adapter chooses colors, ranges and
-character spans; the view converts positions to pixels and draws the shapes.
+character spans; the structure extension converts positions to pixels and draws the shapes.
 Plain supplies `lineNumbers: 'absolute'` and empty decorations/section starts.
 Neither the renderer nor section numbering reads `fnLocs`, `ifLocs`, `constLocs`
 or any other JavaScript analysis field.

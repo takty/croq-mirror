@@ -1,5 +1,5 @@
-import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Text, Transaction, countColumn } from '@codemirror/state';
-import { Decoration, EditorView, GutterMarker, drawSelection, gutter, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
+import { Compartment, EditorState, Prec, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
+import { Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
 import {
 	cursorDocEnd, cursorDocStart, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp,
 	defaultKeymap, deleteLine, history, historyKeymap, indentLess, insertTab,
@@ -11,10 +11,12 @@ import { acceptCompletion, autocompletion, closeBracketsKeymap, closeCompletion,
 import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
-import { drawStructure } from './structure-view.js';
+import { refreshStructure, setStructure, structureView } from './extensions/structure-view/index.js';
+import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber, refreshFunctionLineNumbers, sectionNumberState, setSectionStarts } from './extensions/function-line-numbers/index.js';
+import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
+import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
 
 const TAB_SIZE = 4;
-const RULER_COLUMNS = [4, 8, 12];
 const legacyKeymap = [
 	{ key: 'Mod-d', run: deleteLine, preventDefault: true },
 	{ win: 'Ctrl-Shift-z', run: redo, preventDefault: true },
@@ -73,64 +75,6 @@ const argumentHintField = StateField.define({
 	provide: field => showTooltip.from(field),
 });
 
-const sections = data => data?.sectionStarts || [];
-
-function sectionNumber(starts, line) {
-	let low = 0, high = starts.length;
-	while (low < high) {
-		const middle = (low + high) >>> 1;
-		if (starts[middle] <= line) low = middle + 1;
-		else high = middle;
-	}
-	return [low, line - (starts[low - 1] ?? 0) + 1];
-}
-
-class LineNumber extends GutterMarker {
-	constructor(section, line) {
-		super();
-		this.section = section;
-		this.line = line;
-	}
-
-	eq(other) {
-		return this.section === other.section && this.line === other.line;
-	}
-
-	toDOM(view) {
-		const element = view.dom.ownerDocument.createElement('span');
-		const start = this.section > 0 && this.line === 1;
-		element.className = start ? 'cm-function-number' : 'cm-croq-line-number';
-		element.classList.toggle('cm-function-even', this.section % 2 !== 0);
-		element.textContent = start ? this.section : this.line;
-		return element;
-	}
-}
-
-function widestLineNumber(doc) {
-	return '9'.repeat(String(doc.lines).length);
-}
-
-function numberGutter(sectionMode) {
-	return gutter({
-		class: sectionMode ? 'cm-sectionNumbers' : 'cm-lineNumbers',
-		lineMarker(view, block) {
-			const line = view.state.doc.lineAt(block.from).number;
-			return sectionMode
-				? new LineNumber(...sectionNumber(sections(view.state.field(presentationField)), line - 1))
-				: new LineNumber(0, line);
-		},
-		lineMarkerChange: update => sectionMode && update.startState.field(presentationField) !== update.state.field(presentationField),
-		initialSpacer: view => new LineNumber(0, widestLineNumber(view.state.doc)),
-		updateSpacer(spacer, { state }) {
-			const number = widestLineNumber(state.doc);
-			return spacer.line === number ? spacer : new LineNumber(0, number);
-		},
-	});
-}
-
-const absoluteGutter = numberGutter(false);
-const sectionGutter = [numberGutter(true), EditorView.editorAttributes.of({ class: 'cm-section-mode' })];
-
 export function offsetAt(doc, { line, ch }) {
 	const row = doc.line(Math.max(1, Math.min(doc.lines, line + 1)));
 	return row.from + Math.max(0, Math.min(row.length, ch ?? 0));
@@ -150,7 +94,6 @@ export class Editor {
 		this.autoFormat = false;
 		this.autoIndent = false;
 		this.completion = true;
-		this.rulers = true;
 		this.sectionNumbers = false;
 		this.changedLine = null;
 		this.abort = new AbortController();
@@ -162,6 +105,7 @@ export class Editor {
 			numbers: new Compartment(),
 			access: new Compartment(),
 			diagnostics: new Compartment(),
+			rulers: new Compartment(),
 		};
 		const customKeys = [
 			{ key: 'Ctrl-\\', run: () => this.complete() },
@@ -199,10 +143,14 @@ export class Editor {
 					cut: (_event, view) => hasNoSelection(view),
 				}),
 				presentationField,
+				structureView,
+				this.options.rulers.of(indentRulers),
+				sectionNumberState,
+				gutterLineSelection,
 				highlightField,
 				argumentHintField,
 				lintGutter(),
-				this.options.numbers.of(absoluteGutter),
+				this.options.numbers.of(absoluteLineNumbers),
 				search({ top: true }),
 				autocompletion({
 					activateOnTyping: false,
@@ -232,38 +180,11 @@ export class Editor {
 			},
 		});
 
-		this.overlay = document.createElement('div');
-		this.overlay.className = 'cm-structure-overlay';
-		this.overlay.setAttribute('aria-hidden', 'true');
-		this.canvas = document.createElement('canvas');
-		this.canvas.className = 'code-structure-view';
-		this.overlay.append(this.canvas);
-		this.view.dom.append(this.overlay);
-		this.ruler = document.createElement('div');
-		this.ruler.className = 'cm-croq-rulers';
-		this.ruler.setAttribute('aria-hidden', 'true');
-		this.ruler.append(...RULER_COLUMNS.map(column => {
-			const rule = document.createElement('span');
-			rule.style.setProperty('--ruler-column', column);
-			return rule;
-		}));
-		this.overlay.append(this.ruler);
-		this.scrollMarkers = document.createElement('div');
-		this.scrollMarkers.className = 'cm-section-scroll-markers';
-		this.scrollMarkers.setAttribute('aria-hidden', 'true');
-		this.view.dom.append(this.scrollMarkers);
-		this.measure = {
-			key: this,
-			read: view => this.measureStructure(view),
-			write: measurement => this.paintStructure(measurement),
-		};
-		this.listen(this.view.scrollDOM, 'scroll', () => this.refresh(), { passive: true });
 		this.listen(this.view.dom, 'wheel', event => {
 			if (this.enabled && event.ctrlKey) onFontSizeChange(event.deltaY > 0 ? -2 : 2);
 		}, { passive: true });
 		this.listen(this.view.contentDOM, 'keypress', event => this.scheduleCompletion(event));
 		this.listen(this.view.contentDOM, 'mousemove', () => { this.view.contentDOM.style.cursor = ''; });
-		this.initGutterSelection();
 		this.refresh();
 	}
 
@@ -271,53 +192,8 @@ export class Editor {
 		target.addEventListener(type, handler, { ...options, signal: this.abort.signal });
 	}
 
-	initGutterSelection() {
-		let anchor = null, down = null;
-		const view = this.view;
-		const lineAt = event => view.state.doc.lineAt(view.posAtCoords({
-			x: view.contentDOM.getBoundingClientRect().left + 2,
-			y: event.clientY,
-		}, false)).number;
-		const select = line => {
-			const { doc } = view.state;
-			const from = doc.line(Math.min(anchor, doc.lines));
-			const to = doc.line(line);
-			const tail = row => Math.min(doc.length, row.to + 1);
-			view.dispatch({
-				selection: anchor <= line ? EditorSelection.single(from.from, tail(to)) : EditorSelection.single(tail(from), to.from),
-				userEvent: 'select.pointer',
-			});
-		};
-		this.listen(view.dom, 'mousedown', event => {
-			if (event.button !== 0 || !this.enabled || !event.target.closest('.cm-gutters')) return;
-			if (event.target.closest('.cm-lint-marker')) return;
-			event.preventDefault();
-			down = lineAt(event);
-			if (event.shiftKey) {
-				anchor ??= view.state.doc.lineAt(view.state.selection.main.head).number;
-				this.setLineSelectionMode(false);
-			} else if (!this.lineSelection || anchor === null) {
-				anchor = down;
-			}
-			select(down);
-			view.focus();
-		});
-		this.listen(view.dom, 'mousemove', event => {
-			if (down !== null && event.buttons === 1) select(lineAt(event));
-		});
-		this.listen(window, 'mouseup', event => {
-			if (down !== null && !event.shiftKey && event.target.closest?.('.cm-gutters') && lineAt(event) === down) {
-				this.setLineSelectionMode(true);
-				anchor = down;
-			}
-			down = null;
-		});
-		this.listen(window, 'blur', () => this.setLineSelectionMode(false));
-	}
-
 	setLineSelectionMode(enabled) {
-		this.lineSelection = enabled;
-		this.view.dom.classList.toggle('line-selection-mode', enabled);
+		this.view.dispatch({ effects: setLineSelectionMode.of(enabled) });
 	}
 
 	setOptions(settings, phrases, diagnosticSource) {
@@ -329,7 +205,6 @@ export class Editor {
 		this.readOnly = settings.readOnly;
 		this.autoIndent = settings.autoIndent;
 		this.completion = settings.completion;
-		this.rulers = settings.rulers;
 		this.sectionNumbers = settings.analysis && settings.functionLineNumbers
 			&& this.language.presentation().lineNumbers !== 'absolute';
 		view.dom.style.fontFamily = settings.fontFamily;
@@ -339,7 +214,8 @@ export class Editor {
 		view.dispatch({ effects: [
 			this.options.phrases.reconfigure(EditorState.phrases.of(phrases)),
 			this.options.wrapping.reconfigure(settings.lineWrapping ? EditorView.lineWrapping : []),
-			this.options.numbers.reconfigure(this.sectionNumbers ? sectionGutter : absoluteGutter),
+			this.options.rulers.reconfigure(settings.rulers ? indentRulers : []),
+			this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers),
 			this.options.access.reconfigure([
 				EditorState.readOnly.of(this.readOnly || !this.enabled),
 				EditorView.editable.of(this.enabled),
@@ -441,7 +317,6 @@ export class Editor {
 		const transaction = transactions.at(-1);
 		const { view } = this;
 		if (view.state !== transaction.state) return;
-		if (view.state.selection.main.empty) this.setLineSelectionMode(false);
 		if (view.hasFocus) {
 			view.contentDOM.style.cursor = 'none';
 			clearTimeout(this.pointerTimer);
@@ -533,12 +408,17 @@ export class Editor {
 	}
 
 	setPresentation(data) {
-		this.view.dispatch({ effects: setPresentation.of(data ?? null) });
+		const { decorations = [], sectionStarts = [], ...presentation } = data ?? {};
+		this.view.dispatch({ effects: [
+			setPresentation.of(data ? presentation : null),
+			setStructure.of(decorations),
+			setSectionStarts.of(sectionStarts),
+		] });
 		this.refresh();
 	}
 
 	getSectionLineNumber(line) {
-		return sectionNumber(sections(this.view.state.field(presentationField)), line);
+		return getSectionLineNumber(this.view.state, line);
 	}
 
 	highlightLine(id, line) {
@@ -571,69 +451,11 @@ export class Editor {
 	}
 
 	refresh() {
-		if (this.measure) this.view.requestMeasure(this.measure);
-	}
-
-	measureStructure(view) {
-		const root = view.dom.getBoundingClientRect();
-		const scroller = view.scrollDOM;
-		const frame = scroller.getBoundingClientRect();
-		const content = view.contentDOM.getBoundingClientRect();
-		const linePadding = parseFloat(getComputedStyle(view.contentDOM).getPropertyValue('--croq-mirror-line-padding')) || 0;
-		const left = Math.max(frame.left, content.left);
-		const width = Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left));
-		const height = scroller.clientHeight;
-		const data = view.state.field(presentationField);
-		const { doc, tabSize } = view.state;
-		const coords = (pos, side = 1) => {
-			const offset = offsetAt(doc, pos);
-			const measured = view.coordsAtPos(offset, side);
-			const block = view.lineBlockAt(offset);
-			const lineTop = view.documentTop + block.top - frame.top;
-			if (measured) {
-				const glyphTop = (measured.top + measured.bottom - view.defaultLineHeight) / 2 - frame.top;
-				const row = Math.max(0, Math.round((glyphTop - lineTop) / view.defaultLineHeight));
-				return { x: measured.left - left, y: lineTop + row * view.defaultLineHeight };
-			}
-			const columns = countColumn(doc.sliceString(block.from, offset), tabSize);
-			return { x: content.left - left + linePadding + columns * view.defaultCharacterWidth, y: lineTop };
-		};
-		const decorations = (data?.decorations || []).map(item => {
-			const start = coords(item.from);
-			const end = coords(item.to, -1);
-			if (item.kind === 'token') return { ...item, start, end };
-			return {
-				...item, start, end,
-				spine: coords({ ...item.from, ch: item.from.ch + item.spineChars + 1 }, -1).x - start.x - item.spineChars,
-				branchWidth: coords({ ...item.from, ch: item.from.ch + item.branchChars + 1 }, -1).x - start.x - item.branchChars,
-				branchRows: item.branches.map(branch => coords(branch).y),
-			};
-		});
-		const markers = this.sectionNumbers && scroller.scrollHeight > height ? sections(data).map(line => {
-			const block = view.lineBlockAt(doc.line(line + 1).from);
-			return (block.top + view.defaultLineHeight / 2) / Math.max(view.contentHeight, 1) * 100;
-		}) : [];
-		return {
-			left: left - root.left, top: frame.top - root.top, width, height,
-			rulerX: content.left - left + linePadding,
-			charWidth: view.defaultCharacterWidth, lineHeight: view.defaultLineHeight,
-			decorations, markers,
-		};
-	}
-
-	paintStructure(data) {
-		Object.assign(this.overlay.style, { left: data.left + 'px', top: data.top + 'px', width: data.width + 'px', height: data.height + 'px' });
-		drawStructure(this.canvas, data);
-		this.ruler.hidden = !this.rulers;
-		this.ruler.style.left = data.rulerX + 'px';
-		this.ruler.style.setProperty('--ruler-character-width', data.charWidth + 'px');
-		this.scrollMarkers.style.top = data.top + 'px';
-		this.scrollMarkers.style.height = data.height + 'px';
-		this.scrollMarkers.replaceChildren(...data.markers.map(position => {
-			const marker = document.createElement('span');
-			marker.style.top = position + '%';
-			return marker;
-		}));
+		if (this.view) {
+			refreshStructure(this.view);
+			refreshFunctionLineNumbers(this.view);
+			refreshIndentRulers(this.view);
+		}
 	}
 
 	destroy() {

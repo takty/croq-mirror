@@ -43,6 +43,12 @@ try {
 		a.loadDocument(text);
 		assert(a.getLineCount() === count, 'line count includes empty and trailing lines: ' + count);
 	}
+	a.loadDocument('a \tb\nc \td');
+	const whitespaceLines = () => [...editorA.querySelectorAll('.cm-content .cm-line')];
+	assert(getComputedStyle(whitespaceLines()[0].querySelector('.cm-highlightSpace')).backgroundImage.includes('radial-gradient') &&
+		getComputedStyle(whitespaceLines()[1].querySelector('.cm-highlightSpace')).backgroundImage === 'none' &&
+		getComputedStyle(whitespaceLines()[1].querySelector('.cm-highlightTab'), '::before').color === 'rgb(251, 221, 230)',
+		'component preserves active-space and inactive-tab display');
 	a.loadDocument('function one() { return 1; }');
 	const clipboardEvents = [];
 	const offCopy = a.on('copy', event => clipboardEvents.push(['copy', event.text]));
@@ -154,24 +160,57 @@ try {
 	assert([...ruler.children].map(rule => rule.style.getPropertyValue('--ruler-column')).join(',') === '4,8,12' &&
 		[...ruler.children].every(rule => getComputedStyle(rule).borderLeftStyle === 'dashed'),
 		'three dashed rulers mark the original indentation columns');
+	themeRoot.style.setProperty('--croq-indent-ruler-color', '#123456');
+	assert(getComputedStyle(ruler.firstElementChild).borderLeftColor === 'rgb(18, 52, 86)' &&
+		getComputedStyle(editorB.querySelector('.cm-croq-rulers > span')).borderLeftColor !== 'rgb(18, 52, 86)',
+		'component ruler styling can be customized independently');
+	themeRoot.style.removeProperty('--croq-indent-ruler-color');
+	a.setSettings({ rulers: false });
+	assert(!editorA.querySelector('.cm-ruler-overlay') && editorB.querySelector('.cm-ruler-overlay'),
+		'ruler setting disables guides only in the selected editor');
+	a.setSettings({ rulers: true });
+	assert(editorA.querySelectorAll('.cm-croq-rulers > span').length === 3,
+		'ruler setting restores guides');
+	await new Promise(resolve => setTimeout(resolve, 120));
+	const restoredRuler = editorA.querySelector('.cm-croq-rulers');
+	const firstLine = editorA.querySelector('.cm-content .cm-line');
+	assert(Math.abs(restoredRuler.firstElementChild.getBoundingClientRect().left -
+		(firstLine.getBoundingClientRect().left + parseFloat(getComputedStyle(firstLine).paddingLeft) +
+		4 * parseFloat(restoredRuler.style.getPropertyValue('--ruler-character-width')))) < 1,
+		'component ruler aligns with its padded text after re-enabling');
 	const gutterWidth = () => editorA.querySelector('.cm-gutters').getBoundingClientRect().width;
 	const normalWidth = gutterWidth();
 	const structureLayer = getComputedStyle(editorA.querySelector('.cm-structure-overlay'));
 	const textLayer = getComputedStyle(editorA.querySelector('.cm-content'));
 	assert(getComputedStyle(editorA.querySelector('.cm-scroller')).zIndex === 'auto' &&
 		Number(textLayer.zIndex) > Number(structureLayer.zIndex), 'source text is painted above the structure canvas');
+	themeRoot.style.setProperty('--croq-structure-overlay-z-index', '-1');
+	assert(getComputedStyle(editorA.querySelector('.cm-structure-overlay')).zIndex === '-1' &&
+		getComputedStyle(editorB.querySelector('.cm-structure-overlay')).zIndex === '0',
+		'structure layering can be customized independently in the component');
+	themeRoot.style.removeProperty('--croq-structure-overlay-z-index');
+	themeRoot.style.setProperty('--croq-function-number-color', '#123456');
+	themeRoot.style.setProperty('--croq-function-lint-gutter-width', '30px');
+	assert(getComputedStyle(editorA.querySelector('.cm-gutter-lint')).width === '30px',
+		'function lint gutter width is customizable from the component container');
+	themeRoot.style.removeProperty('--croq-function-lint-gutter-width');
 	for (const functionLineNumbers of [true, false]) {
 		a.setSettings({ functionLineNumbers });
 		assert(gutterWidth() === normalWidth, 'gutter width is stable when switching line-number modes: ' + functionLineNumbers);
 		const strip = getComputedStyle(editorA.querySelector('.cm-gutters'), '::after');
 		assert(strip.backgroundImage.includes('repeating-linear-gradient') === functionLineNumbers,
 			'only per-function mode displays the striped gutter edge: ' + functionLineNumbers);
+		if (functionLineNumbers) {
+			assert(getComputedStyle(editorA.querySelectorAll('.cm-function-number')[1]).color === 'rgb(18, 52, 86)',
+				'function number color is customizable in the component');
+		}
 		await waitFor(() => editorA.querySelectorAll('.cm-lint-marker-warning').length === 2, 'function diagnostics did not render');
 		for (const [index, marker] of [...editorA.querySelectorAll('.cm-lint-marker-warning')].entries()) {
 			const line = [1, 4][index];
 			const box = marker.getBoundingClientRect();
 			assert(marker.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)), 'lint marker receives pointer over function region: ' + functionLineNumbers + ', line ' + line);
 		}
+		themeRoot.style.removeProperty('--croq-function-number-color');
 	}
 	a.loadDocument('function longFunction() {\n' + '\n'.repeat(999) + '}');
 	await a.analyzeNow();

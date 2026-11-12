@@ -1,0 +1,20 @@
+.cm-editor.cm-structure-view .cm-scroller {
+	z-index: var(--croq-structure-scroller-z-index, auto);
+}
+
+.cm-editor.cm-structure-view .cm-content {
+	z-index: var(--croq-structure-content-z-index, 1);
+}
+
+.cm-editor.cm-structure-view .cm-structure-overlay {
+	position: var(--croq-structure-overlay-position, absolute);
+	z-index: var(--croq-structure-overlay-z-index, 0);
+	overflow: var(--croq-structure-overlay-overflow, hidden);
+	pointer-events: var(--croq-structure-overlay-pointer-events, none);
+}
+
+.cm-editor.cm-structure-view .code-structure-view {
+	display: var(--croq-structure-canvas-display, block);
+	width: var(--croq-structure-canvas-width, 100%);
+	height: var(--croq-structure-canvas-height, 100%);
+}
