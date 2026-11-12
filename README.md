@@ -81,6 +81,8 @@ Position APIs use **zero-based lines and UTF-16 columns** as `{line, ch}`. Repla
 Host document APIs remain available when the editor is read-only or disabled; these settings restrict user interaction.
 
 Editing commands invoked through `execute` do not run in read-only mode. When disabled, all commands and `moveTo` do nothing.
+The current-line and gutter highlights are hidden while any selection range is
+nonempty and return when all ranges are collapsed to cursors.
 Operations after destruction throw errors.
 
 ### Settings
@@ -91,7 +93,7 @@ Use `setDefinitions` to change additional definitions after initialization.
 | Setting | Default | Description |
 | --- | --- | --- |
 | `language` | `'en'` | UI and diagnostic locale: `'ja'` or `'en'` |
-| `codeLanguage` | `'javascript'` | Programming language: `'javascript'` or `null` for plain text; selected at creation |
+| `codeLanguage` | `'javascript'` | Source language: `'javascript'`, `'java'`, or `null` for plain text; selected at creation |
 | `fontFamily` | `monospace` | CSS font-family value; custom fonts must be provided by the host application |
 | `fontSize` | `16` | 10-64 px |
 | `lineHeight` | `165` | Positive percentage |
@@ -110,13 +112,24 @@ Use `setDefinitions` to change additional definitions after initialization.
 
 Unknown setting names, invalid types, and out-of-range values throw errors. Settings are not persisted.
 `codeLanguage` is independent of the UI locale. Omitting it retains JavaScript;
-explicit `null` selects plain text without JavaScript language extensions.
+explicit `null` selects plain text without language-specific extensions.
 Changing `codeLanguage` through `setSettings` throws; recreate the editor to change it.
 
 ```js
 const editor = await createEditor(container, { codeLanguage: null });
 // Plain text, English UI. Add language: 'ja' for a Japanese UI.
 ```
+
+Java uses `web-tree-sitter` and the `tree-sitter-java` grammar in a browser
+worker. The CodeMirror Java parser is also used for immediate bracket matching.
+It supplies provisional syntax coloring during edits; existing Tree-sitter
+highlights are mapped across edits until fresh analysis replaces them.
+Its initial implementation provides syntax highlighting, including
+Java 25 simple source files, structural highlighting for methods and common
+control-flow blocks, variable declarations, local variable references, and
+per-method/lambda line numbers. Local reference detection uses lexical scopes;
+it does not resolve other classes' fields or full Java type information.
+Java diagnostics, completion, and formatting are not implemented yet.
 
 Plain text retains editing, undo/redo, search, and ordinary line numbers. It does
 not create an analysis worker or completion engine. Diagnostics, formatting,
@@ -154,13 +167,14 @@ Explicit analysis failures reject the returned promise.
 ```js
 {
   version, text, success,
-  fnLocs, fnStarts, ifLocs, forLocs, fnNames,
+  fnLocs, classLocs, fnStarts, ifLocs, forLocs, fnNames,
   varLocs, letLocs, constLocs
 }
 ```
 
 The existing analyzer's format is preserved. **Only analysis ranges use one-based lines and zero-based columns as `{line, column}`.**
 Ranges are `[start, end]`, excluding the end position. `ifLocs` includes the start of the else branch as an additional element.
+`classLocs` contains class declaration and expression ranges.
 `fnStarts` contains zero-based lines delimiting function-number sections. `fnNames` contains names of functions, classes, and other constructs collected by the existing analyzer.
 It is not a list of module exports or scope-resolved public symbols.
 As in the original implementation, `forLocs` covers `ForStatement` nodes.
@@ -198,6 +212,10 @@ view.dispatch({ effects: setStructure.of([{
 
 Positions are zero-based `{line, ch}` with UTF-16 columns and exclusive ends.
 Supply ranges as above or tokens as `{kind: 'token', from, to, fill, stroke}`.
+Colors can use `var(--property, fallback)` and are resolved against the editor
+when the canvas is repainted. An optional `opacity` sets the canvas alpha
+(default `1`). JavaScript and Java class ranges use `--croq-mirror-l-red` at
+15% opacity and are drawn underneath their method decorations.
 The caller supplies current data in drawing order and is responsible for rejecting
 stale asynchronous analysis results. Treat the supplied array and its contents
 as immutable after dispatch. Document changes or a `load` user event
@@ -245,6 +263,52 @@ The extension ignores lint markers and allows selection in read-only editors.
 Setting `EditorView.editable` to false disables gutter interaction. Removing
 the extension removes its event listeners and cursor styling.
 
+### Syntax highlighting extension
+
+`croq-mirror/syntax-highlighting` accepts syntax ranges produced by an external
+parser. Ranges use zero-based UTF-16 document offsets and a semantic `kind`;
+the extension does not parse the document. By default, document edits clear
+supplied ranges.
+
+```js
+import { syntaxHighlightingExtension, setSyntaxHighlights } from 'croq-mirror/syntax-highlighting';
+
+// Include syntaxHighlightingExtension in the editor's extensions.
+view.dispatch({ effects: setSyntaxHighlights.of([
+    { from: 0, to: 4, kind: 'keyword' },
+    { from: 5, to: 11, kind: 'type' },
+]) });
+```
+
+Supported kinds are `comment`, `keyword`, `operator`, `type`, `function`, `variable`,
+`literal`, `invalid`, `definition`, `property`, `local-variable`,
+`local-reference`, and `variable-reference`. Java's Tree-sitter worker supplies ranges through
+`setSyntaxHighlights`. JavaScript supplies ranges from its Lezer tree through
+`syntaxHighlightingSource(analyze, needsRefresh)`, which adds a synchronous
+source to the same extension. The source callback receives an `EditorState`;
+the optional `needsRefresh` receives a `ViewUpdate` for changes such as
+incremental syntax-tree updates. Document edits always refresh the source.
+Java uses `syntaxHighlightingSource(analyze, needsRefresh, { retainOnEdit: true })`
+to keep previously supplied ranges mapped across edits and fill uncovered
+positions from its CodeMirror syntax tree until the next worker result arrives.
+Its `reconcileComments` option returns the end of the currently parsed document
+and lets synchronous comment ranges override retained code styling (and vice
+versa) within that parsed region. Retained ranges beyond it remain untouched.
+These retained ranges can temporarily reflect an earlier semantic classification;
+loading a document clears them. With automatic analysis disabled, only the
+CodeMirror-based syntax coloring is available.
+Removing the highlighting extension removes the source's decorations. Local
+reference color can be customized with `--croq-syntax-local-variable-color`.
+The background, shadow, and radius of variable references can be customized with
+`--croq-syntax-reference-background`, `--croq-syntax-reference-shadow`, and
+`--croq-syntax-reference-radius`. Comments, keywords/operators, definitions,
+and literals are bold by default. Literals also have a text shadow; both literal
+text shadows and variable-reference backgrounds/shadows are hidden on the
+active line. Font weights and literal shadows can be customized with
+`--croq-syntax-comment-font-weight`, `--croq-syntax-keyword-font-weight`,
+`--croq-syntax-definition-font-weight`, `--croq-syntax-literal-font-weight`, and
+`--croq-syntax-literal-text-shadow`.
+
 ### Indentation ruler extension
 
 `croq-mirror/indent-rulers` provides standalone guides at character columns 4,
@@ -288,18 +352,19 @@ ancestor to change its appearance without affecting other editors:
 | Function highlighting | `--croq-function-alternate-background`, `--croq-function-alternate-content`, `--croq-function-alternate-position`, `--croq-function-alternate-inset`, `--croq-function-alternate-z-index`, `--croq-function-alternate-pointer-events`, `--croq-function-lint-gutter-width` (component), `--croq-mirror-lint-gutter-width` (standalone) |
 | Function scroll markers | `--croq-function-scroll-marker-track-width`, `--croq-function-scroll-track-position`, `--croq-function-scroll-track-right`, `--croq-function-scroll-track-pointer-events`, `--croq-function-scroll-marker-inset`, `--croq-function-scroll-marker-radius`, `--croq-function-scroll-marker-color`, `--croq-function-scroll-marker-position`, `--croq-function-scroll-marker-aspect-ratio`, `--croq-function-scroll-marker-z-index` |
 | Gutter selection | `--croq-gutter-cursor`, `--croq-gutter-line-selection-cursor` (complete CSS `cursor` values) |
+| Syntax highlighting | `--croq-syntax-comment-color`, `--croq-syntax-comment-font-weight`, `--croq-syntax-keyword-color`, `--croq-syntax-keyword-font-weight`, `--croq-syntax-type-color`, `--croq-syntax-function-color`, `--croq-syntax-definition-color`, `--croq-syntax-definition-font-weight`, `--croq-syntax-property-color`, `--croq-syntax-variable-color`, `--croq-syntax-local-variable-color`, `--croq-syntax-reference-background`, `--croq-syntax-reference-shadow`, `--croq-syntax-reference-radius`, `--croq-syntax-literal-color`, `--croq-syntax-literal-font-weight`, `--croq-syntax-literal-text-shadow`, `--croq-syntax-invalid-decoration` |
 | Indentation rulers | `--croq-indent-ruler-column` (unitless character column), `--croq-indent-ruler-width`, `--croq-indent-ruler-style`, `--croq-indent-ruler-color`, `--croq-indent-ruler-scroller-z-index`, `--croq-indent-ruler-content-z-index`, `--croq-indent-ruler-overlay-position`, `--croq-indent-ruler-overlay-z-index`, `--croq-indent-ruler-overlay-overflow`, `--croq-indent-ruler-pointer-events`, `--croq-indent-ruler-container-position`, `--croq-indent-ruler-container-right`, `--croq-indent-ruler-position`, `--croq-indent-ruler-inset-block` |
 
 Defaults are specified in each extension's `style.css`, including fallbacks to
 the component's existing color variables. These properties can be changed at
 runtime; changing layout or pointer-event properties may affect functionality.
 Structure shapes are painted on a canvas; their fill and stroke colors are
-supplied in the structure data rather than through CSS. Positions calculated
+supplied in the structure data and may reference CSS custom properties. Positions calculated
 by the extensions are applied directly and are not CSS custom properties.
 
 ## Sources and build
 
-`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/extensions/` contains the structure display, function line-number, gutter line-selection, and indentation ruler extensions. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` contains JavaScript-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
+`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/extensions/` contains the structure display, function line-number, gutter line-selection, syntax-highlighting, and indentation ruler extensions. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` and `src/lang/java/` contain language-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
 `src/styles/index.css` imports `variables.css`; both scope their rules to the component. The build bundles these files into the distributed stylesheet. CodeMirror 6 installs its base styles when an editor is mounted.
@@ -310,8 +375,9 @@ The distribution contains:
 
 - `croq-mirror.min.js`: the editor and its dependencies
 - `analysis-worker.min.js`: the analysis worker and its parser dependencies
+- `analysis-worker-java.min.js`, `web-tree-sitter.wasm`, `tree-sitter-java.wasm`: the Java parser worker and WebAssembly runtimes
 - `croq-mirror.min.css`: the combined, scoped editor styles
-- `structure-view.js`, `function-line-numbers.js`, `gutter-line-selection.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
+- `structure-view.js`, `function-line-numbers.js`, `gutter-line-selection.js`, `syntax-highlighting.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
 - JavaScript source maps for debugging; these are not required at runtime
 - `licenses/`: third-party licenses
 

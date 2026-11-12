@@ -1,11 +1,12 @@
 import { closeBrackets } from '@codemirror/autocomplete';
 import { javascript, javascriptLanguage as javascriptSyntax } from '@codemirror/lang-javascript';
-import { bracketMatching, HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
+import { bracketMatching, syntaxTree } from '@codemirror/language';
+import { EditorView } from '@codemirror/view';
 import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
-import { localVariables } from './local-variables.js';
+import { syntaxHighlightingExtension, syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
+import { analyzeSyntax } from './syntax-analysis.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
 // crosses this boundary; the view applies returned data to its own document/UI.
@@ -15,17 +16,9 @@ export const javascriptLanguage = {
 		javascriptSyntax.data.of({ closeBrackets: { brackets: ['(', '[', "'", '"', '`'] } }),
 		closeBrackets(),
 		bracketMatching(),
-		localVariables,
-		syntaxHighlighting(HighlightStyle.define([
-			{ tag: tags.comment, class: 'cm-comment' },
-			{ tag: [tags.keyword, tags.operator, tags.meta], class: 'cm-keyword' },
-			{ tag: [tags.bool, tags.null, tags.atom, tags.number, tags.string, tags.special(tags.string), tags.regexp], class: 'cm-literal' },
-			{ tag: [tags.definition(tags.variableName), tags.definition(tags.propertyName)], class: 'cm-definition' },
-			{ tag: tags.variableName, class: 'cm-variable' },
-			{ tag: tags.local(tags.variableName), class: 'cm-local-variable' },
-			{ tag: tags.propertyName, class: 'cm-property' },
-			{ tag: tags.invalid, class: 'cm-invalid' },
-		])),
+		EditorView.editorAttributes.of({ class: 'cm-javascript' }),
+		syntaxHighlightingExtension,
+		syntaxHighlightingSource(analyzeSyntax, update => syntaxTree(update.startState) !== syntaxTree(update.state)),
 	],
 
 	createAnalysisClient() {
@@ -79,13 +72,15 @@ export const javascriptLanguage = {
 	presentation(analysis = {}) {
 		const position = p => ({ line: p.line - 1, ch: p.column });
 		const decorations = [];
-		for (const [key, fill] of [
+		for (const [key, fill, opacity] of [
+			['classLocs', 'var(--croq-mirror-l-red, #e61e58)', 0.15],
 			['fnLocs', 'hsla(40, 100%, 50%, 0.15)'],
 			['ifLocs', 'hsla(150, 100%, 35%, 0.15)'],
 			['forLocs', 'hsla(190, 90%, 50%, 0.20)'],
 		]) {
 			for (const [from, to, ...branches] of analysis[key] || []) {
 				decorations.push({ kind: 'range', from: position(from), to: position(to), fill,
+					...(opacity === undefined ? {} : { opacity }),
 					spineChars: 3, branchChars: 4, branches: branches.map(position) });
 			}
 		}

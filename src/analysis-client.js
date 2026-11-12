@@ -14,6 +14,10 @@ export class AnalysisClient {
 					resolve();
 					return;
 				}
+				if (data.error && data.id === undefined) {
+					this.fail(new Error(data.error));
+					return;
+				}
 				const pending = this.pending.get(data.id);
 				if (!pending) return;
 				this.pending.delete(data.id);

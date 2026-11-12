@@ -102,7 +102,20 @@ try {
 				assert(document.querySelectorAll('.cm-editor').length === 1, 'One editor must mount');
 				await document.querySelector('#analysis').onclick();
 				const analysis = JSON.parse(document.querySelector('#status').textContent);
-				assert(analysis.success && analysis.fnNames.includes('greet'), 'Worker must analyze sample');
+				assert(analysis.success && analysis.fnNames.includes('Greeter') && analysis.classLocs.length === 1,
+					'Worker must analyze sample class');
+				const classPainted = () => {
+					const canvas = document.querySelector('.code-structure-view');
+					if (!canvas?.width || !canvas?.height) return false;
+					const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+					for (let i = 0; i < pixels.length; i += 4) {
+						if (pixels[i] >= 220 && pixels[i + 1] < 45 && pixels[i + 2] >= 70 &&
+							pixels[i + 2] <= 100 && pixels[i + 3] >= 37 && pixels[i + 3] <= 39) return true;
+					}
+					return false;
+				};
+				for (let i = 0; i < 100 && !classPainted(); i++) await new Promise(resolve => setTimeout(resolve, 20));
+				assert(classPainted(), 'JavaScript sample class must be painted in translucent theme red');
 				document.querySelector('#readonly').click();
 				assert(JSON.parse(document.querySelector('#status').textContent).readOnly, 'Read-only control must work');
 				await document.querySelector('#paste').onclick();
@@ -118,7 +131,7 @@ try {
 		if (docs.exceptionDetails || docs.result?.value !== true) throw new Error('Built docs check failed: ' + JSON.stringify(docs));
 		console.log('Built docs passed: one editor, worker, read-only, recreate, default font, subdirectory URLs.');
 		const pastePoint = await send('Runtime.evaluate', {
-			expression: `(() => { const box = document.querySelector('#paste').getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; })()`,
+			expression: `(() => { const button = document.querySelector('#paste'); button.scrollIntoView(); const box = button.getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; })()`,
 			returnByValue: true,
 		}, sessionId);
 		await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...pastePoint.result.value }, sessionId);
@@ -127,7 +140,7 @@ try {
 		const pasteStatus = await send('Runtime.evaluate', {
 			expression: `document.querySelector('#status').textContent`, returnByValue: true,
 		}, sessionId);
-		if (!/^(Editor text changed after Paste\.|No text change detected\.|Paste failed:)/.test(pasteStatus.result?.value)) throw new Error('Paste demo did not report its result');
+		if (!/^(Editor text changed after Paste\.|No text change detected\.|Paste failed:)/.test(pasteStatus.result?.value)) throw new Error('Paste demo did not report its result: ' + JSON.stringify(pasteStatus.result?.value));
 		console.log('Built docs Paste button: ' + pasteStatus.result.value);
 		const markerPoint = await send('Runtime.evaluate', {
 			expression: `(async () => {
@@ -154,6 +167,56 @@ try {
 		}, sessionId);
 		if (!hover.result?.value) throw new Error('Sample lint tooltip did not appear on mouse hover');
 		console.log('Built docs passed: native mouse hover opens lint tooltip in function line-number mode.');
+		const languageSwitch = await send('Runtime.evaluate', {
+			expression: `(async () => {
+				const assert = (condition, message) => { if (!condition) throw new Error(message); };
+				document.querySelector('#code-language input[value="java"]').click();
+				for (let i = 0; i < 100 && !document.querySelector('#status').textContent.includes('Switched to java'); i++)
+					await new Promise(resolve => setTimeout(resolve, 20));
+				const structureIsPainted = () => {
+					const canvas = document.querySelector('.code-structure-view');
+					if (!canvas?.width || !canvas?.height) return false;
+					const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+					return pixels.some((value, index) => index % 4 === 3 && value > 0);
+				};
+				const classPainted = () => {
+					const canvas = document.querySelector('.code-structure-view');
+					if (!canvas?.width || !canvas?.height) return false;
+					const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+					for (let i = 0; i < pixels.length; i += 4) {
+						if (pixels[i] >= 220 && pixels[i + 1] < 45 && pixels[i + 2] >= 70 &&
+							pixels[i + 2] <= 100 && pixels[i + 3] >= 37 && pixels[i + 3] <= 39) return true;
+					}
+					return false;
+				};
+				for (let i = 0; i < 100 && !classPainted(); i++)
+					await new Promise(resolve => setTimeout(resolve, 20));
+				const count = [...document.querySelectorAll('.cm-content .cm-line:nth-child(5) .cm-syntax-variable-reference')]
+					.find(node => node.textContent === 'count');
+				const switchedToJava = document.querySelector('#status').textContent === 'Switched to java.';
+				await document.querySelector('#analysis').onclick();
+				const javaAnalysis = JSON.parse(document.querySelector('#status').textContent);
+				assert(switchedToJava &&
+					document.querySelector('.cm-syntax-keyword')?.textContent === 'class' &&
+					[...document.querySelectorAll('.cm-sectionNumbers .cm-function-number')]
+						.map(element => element.textContent).join() === '1,2' &&
+					structureIsPainted() && classPainted() && count && getComputedStyle(count).boxShadow !== 'none' &&
+					javaAnalysis.decorations.some(item => item.fill === 'var(--croq-mirror-l-red, #e61e58)'),
+					'Built docs Java renders syntax, structure, per-method line numbers, and reference highlighting');
+				document.querySelector('#code-language input[value="javascript"]').click();
+				for (let i = 0; i < 100 && !document.querySelector('#status').textContent.includes('Switched to javascript'); i++)
+					await new Promise(resolve => setTimeout(resolve, 20));
+				assert(document.querySelector('#status').textContent === 'Switched to javascript.' &&
+					document.querySelector('.cm-editor').classList.contains('cm-javascript') &&
+					document.querySelector('.cm-syntax-keyword')?.textContent === 'function',
+					'Built docs switches back to JavaScript');
+				return true;
+			})()`,
+			awaitPromise: true,
+			returnByValue: true,
+		}, sessionId);
+		if (languageSwitch.exceptionDetails || languageSwitch.result?.value !== true) throw new Error('Built docs language switch failed: ' + JSON.stringify(languageSwitch));
+		console.log('Built docs passed: switch source language between JavaScript and Java.');
 		if (process.argv.includes('--screenshot')) {
 			const capture = await send('Page.captureScreenshot', { format: 'png' }, sessionId);
 			await writeFile(resolve(here, `${name}-example.png`), Buffer.from(capture.data, 'base64'));

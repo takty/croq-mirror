@@ -52,6 +52,7 @@ async function buildJavaScript() {
 		entryPoints  : {
 			'croq-mirror'    : join(stageRoot, 'index.js'),
 			'analysis-worker': join(stageRoot, 'lang/js/analysis-worker.js'),
+			'analysis-worker-java': join(stageRoot, 'lang/java/analysis-worker.js'),
 		},
 		outdir       : out,
 		outExtension : { '.js': '.min.js' },
@@ -70,6 +71,7 @@ async function buildJavaScript() {
 			'function-line-numbers': join(stageRoot, 'extensions', 'function-line-numbers', 'index.js'),
 			'gutter-line-selection': join(stageRoot, 'extensions', 'gutter-line-selection', 'index.js'),
 			'indent-rulers': join(stageRoot, 'extensions', 'indent-rulers', 'index.js'),
+			'syntax-highlighting': join(stageRoot, 'extensions', 'syntax-highlighting', 'index.js'),
 		},
 		outdir: out,
 		bundle: true,
@@ -80,6 +82,8 @@ async function buildJavaScript() {
 		target: 'es2022',
 		legalComments: 'inline',
 	});
+	await copyFileIfChanged(join(resolvePackageDir('web-tree-sitter'), 'web-tree-sitter.wasm'), join(out, 'web-tree-sitter.wasm'));
+	await copyFileIfChanged(join(resolvePackageDir('tree-sitter-java'), 'tree-sitter-java.wasm'), join(out, 'tree-sitter-java.wasm'));
 }
 
 async function buildStyle() {
@@ -97,9 +101,9 @@ async function buildStyle() {
 
 async function copyLicenses() {
 	for (const name of ['@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language',
-		'@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint', '@codemirror/search',
-		'@lezer/common', '@lezer/highlight', '@lezer/javascript', '@lezer/lr',
-		'@marijn/find-cluster-break', 'crelt', 'style-mod', 'w3c-keyname', 'acorn', 'acorn-loose', 'acorn-walk', 'tern', 'jshint', 'jshint-ja-edu', 'js-beautify']) {
+		'@codemirror/lang-java', '@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint', '@codemirror/search',
+		'@lezer/common', '@lezer/highlight', '@lezer/java', '@lezer/javascript', '@lezer/lr',
+		'@marijn/find-cluster-break', 'crelt', 'style-mod', 'w3c-keyname', 'acorn', 'acorn-loose', 'acorn-walk', 'tern', 'jshint', 'jshint-ja-edu', 'js-beautify', 'web-tree-sitter', 'tree-sitter-java']) {
 		const dir = resolvePackageDir(name);
 		for (const file of await readdir(dir)) {
 			if (/^(license|copying)/i.test(file)) await copyFileIfChanged(join(dir, file), join(out, 'licenses', name.replace(/^@/, '').replace('/', '-') + '-' + file));

@@ -1,16 +1,33 @@
-import { RangeSetBuilder } from '@codemirror/state';
-import { Decoration, ViewPlugin } from '@codemirror/view';
-import { syntaxTree } from '@codemirror/language';
+import { HighlightStyle, syntaxTree } from '@codemirror/language';
+import { highlightTree, tags } from '@lezer/highlight';
+
+const style = HighlightStyle.define([
+	{ tag: tags.comment, class: 'comment' },
+	{ tag: [tags.keyword, tags.operator, tags.meta], class: 'keyword' },
+	{ tag: [tags.bool, tags.null, tags.atom, tags.number, tags.string, tags.special(tags.string), tags.regexp], class: 'literal' },
+	{ tag: [tags.definition(tags.variableName), tags.definition(tags.propertyName)], class: 'definition' },
+	{ tag: tags.variableName, class: 'variable' },
+	{ tag: tags.local(tags.variableName), class: 'local-variable' },
+	{ tag: tags.propertyName, class: 'property' },
+	{ tag: tags.invalid, class: 'invalid' },
+]);
 
 const functionScopes = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunction', 'MethodDeclaration']);
 const blockScopes = new Set(['Block', 'ForStatement', 'CatchClause', 'SwitchBody', 'ClassDeclaration', 'ClassExpression']);
 const declarations = new Set(['VariableDeclaration', 'ForInSpec', 'ForOfSpec']);
-const localReference = Decoration.mark({ class: 'cm-local-reference' });
-
-function highlightLocals(state) {
+export function analyzeSyntax(state) {
+	const tree = syntaxTree(state);
+	const highlights = [];
+	highlightTree(tree, style, (from, to, classes) => {
+		const kinds = new Set(classes.split(' '));
+		for (const kind of kinds) highlights.push({ from, to, kind });
+		if (kinds.has('variable') || kinds.has('local-variable')) {
+			highlights.push({ from, to, kind: 'variable-reference' });
+		}
+	});
 	const references = [];
 	let scope = null;
-	syntaxTree(state).iterate({
+	tree.iterate({
 		enter(node) {
 			const isFunction = functionScopes.has(node.name);
 			if (isFunction || blockScopes.has(node.name)) {
@@ -41,25 +58,13 @@ function highlightLocals(state) {
 		},
 	});
 
-	const marks = new RangeSetBuilder();
 	for (const { from, to, scope } of references) {
 		const name = state.sliceDoc(from, to);
 		for (let binding = scope; binding; binding = binding.parent) {
 			if (!binding.names.has(name)) continue;
-			marks.add(from, to, localReference);
+			highlights.push({ from, to, kind: 'local-reference' });
 			break;
 		}
 	}
-	return marks.finish();
+	return highlights;
 }
-
-export const localVariables = ViewPlugin.fromClass(class {
-	constructor(view) {
-		this.decorations = highlightLocals(view.state);
-	}
-
-	update({ changes, docChanged, startState, state }) {
-		if (syntaxTree(startState) !== syntaxTree(state)) this.decorations = highlightLocals(state);
-		else if (docChanged) this.decorations = this.decorations.map(changes);
-	}
-}, { decorations: plugin => plugin.decorations });

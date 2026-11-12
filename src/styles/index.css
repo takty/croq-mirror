@@ -115,33 +115,16 @@
 .croq-mirror .cm-editor .cm-gutter-lint { width: var(--croq-mirror-lint-gutter-width); }
 .croq-mirror .cm-editor .cm-lint-marker { vertical-align: middle; }
 
-.croq-mirror .cm-comment { color: var(--croq-mirror-l-gray); font-weight: bold; }
-.croq-mirror .cm-keyword { color: var(--croq-mirror-l-bodybrown); font-weight: bold; }
-.croq-mirror .cm-literal {
-	color: var(--croq-mirror-l-orange);
-	font-weight: bold;
-	text-shadow: var(--croq-mirror-l-yellow) 0 0 0.25em;
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-comment { color: var(--croq-syntax-comment-color, var(--croq-mirror-l-gray)); }
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-keyword { color: var(--croq-syntax-keyword-color, var(--croq-mirror-l-bodybrown)); }
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-literal { color: var(--croq-syntax-literal-color, var(--croq-mirror-l-orange)); }
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-definition { color: var(--croq-syntax-definition-color, var(--croq-mirror-color-text)); }
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-property { color: var(--croq-syntax-property-color, var(--croq-mirror-l-blue)); }
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-variable { color: var(--croq-syntax-variable-color, var(--croq-mirror-l-turquoise)); }
+.croq-mirror .cm-editor.cm-javascript :is(.cm-syntax-local-variable, .cm-syntax-local-reference, .cm-syntax-local-reference .cm-syntax-variable) {
+	color: var(--croq-syntax-local-variable-color, hsl(86 60% 30%));
 }
-.croq-mirror .cm-definition { color: var(--croq-mirror-color-text); font-weight: bold; }
-.croq-mirror .cm-property { color: var(--croq-mirror-l-blue); }
-.croq-mirror .cm-variable { color: var(--croq-mirror-l-turquoise); }
-.croq-mirror .cm-local-variable,
-.croq-mirror .cm-editor :is(.cm-local-reference, .cm-local-reference .cm-variable) {
-	color: hsl(86 60% 30%);
-}
-.croq-mirror .cm-variable,
-.croq-mirror .cm-local-variable {
-	border-radius: 0 0.35em 0.35em 0;
-	box-shadow: 0 2px 6px color-mix(in srgb, var(--croq-mirror-l-blue) 15%, transparent), 0 -1px 6px color-mix(in srgb, var(--croq-mirror-l-blue) 15%, transparent);
-	background-color: color-mix(in srgb, var(--croq-mirror-color-editor) 95%, transparent);
-}
-.croq-mirror .cm-invalid { border-bottom: 0.15em solid var(--croq-mirror-l-red); }
-.croq-mirror .cm-activeLine .cm-literal { text-shadow: none; }
-.croq-mirror .cm-activeLine :is(.cm-variable, .cm-local-variable) {
-	border-radius: 0;
-	box-shadow: none;
-	background-color: transparent;
-}
+.croq-mirror .cm-editor.cm-javascript .cm-syntax-invalid { text-decoration: var(--croq-syntax-invalid-decoration, none); border-bottom: 0.15em solid var(--croq-mirror-l-red); }
 
 .croq-mirror .cm-editor .cm-highlightSpace { background-image: none; }
 .croq-mirror .cm-editor .cm-activeLine .cm-highlightSpace {
@@ -167,9 +150,42 @@
 	text-shadow: none;
 }
 
-.croq-mirror .cm-editor .cm-matchingBracket {
-	background: color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
+.croq-mirror .cm-editor :is(.cm-matchingBracket, .cm-bracket-gutter-mark) {
+	background: transparent;
+	color: inherit;
+	font-weight: bold;
+	position: relative;
+	isolation: isolate;
+}
+.croq-mirror .cm-editor .cm-bracket-gutter-overlay {
+	position: absolute;
+	z-index: 4;
+	overflow: hidden;
+	pointer-events: none;
+}
+.croq-mirror .cm-editor .cm-bracket-gutter-mark { position: absolute; }
+.croq-mirror .cm-editor :is(.cm-matchingBracket, .cm-bracket-gutter-mark)::before {
+	content: '';
+	position: absolute;
+	z-index: -1;
+	top: -0.45em;
+	left: -0.75em;
+	right: -0.75em;
+	bottom: -0.45em;
+	border-radius: 50%;
+	border: 0.5em solid color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
+}
+.croq-mirror .cm-editor .cm-activeLine .cm-matchingBracket::before {
+	top: 0;
+	left: 0.05em;
+	right: 0.05em;
+	bottom: 0;
 	border-radius: 0.25em;
+	border: none;
+	background-color: color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
+}
+.croq-mirror .cm-editor :is(.cm-syntax-comment .cm-matchingBracket, .cm-matchingBracket.cm-syntax-comment)::before {
+	content: none;
 }
 .croq-mirror .cm-editor .cm-selectionMatch {
 	background: transparent;

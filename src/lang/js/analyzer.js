@@ -47,6 +47,7 @@ function createVisitor() {
 	const ID      = 'Identifier';
 
 	const fnLocs    = [];
+	const classLocs = [];
 	const ifLocs    = [];
 	const forLocs   = [];
 	const fnNames   = [];
@@ -58,6 +59,10 @@ function createVisitor() {
 	return {
 		ClassDeclaration: (node, state, c) => {
 			fnNames.push(node.id?.name);
+			classLocs.push([node.loc.start, node.loc.end]);
+		},
+		ClassExpression: (node, state, c) => {
+			classLocs.push([node.loc.start, node.loc.end]);
 		},
 		VariableDeclaration: (node, state, c) => {  // const f = function () {...};
 			for (let d of node.declarations) {
@@ -130,7 +135,7 @@ function createVisitor() {
 					lastEnd = end.line - 1;
 				}
 			}
-			return Object.assign({ fnLocs, fnStarts, ifLocs, forLocs, fnNames: fnNames.filter(Boolean), varLocs, letLocs, constLocs }, object);
+			return Object.assign({ fnLocs, classLocs, fnStarts, ifLocs, forLocs, fnNames: fnNames.filter(Boolean), varLocs, letLocs, constLocs }, object);
 		}
 	};
 }

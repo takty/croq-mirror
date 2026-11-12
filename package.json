@@ -10,7 +10,8 @@
 		"./structure": "./dist/structure-view.js",
 		"./function-line-numbers": "./dist/function-line-numbers.js",
 		"./gutter-line-selection": "./dist/gutter-line-selection.js",
-		"./indent-rulers": "./dist/indent-rulers.js"
+		"./indent-rulers": "./dist/indent-rulers.js",
+		"./syntax-highlighting": "./dist/syntax-highlighting.js"
 	},
 	"files": [
 		"dist"
@@ -26,6 +27,7 @@
 	"dependencies": {
 		"@codemirror/autocomplete": "6.20.1",
 		"@codemirror/commands": "6.10.3",
+		"@codemirror/lang-java": "6.0.2",
 		"@codemirror/lang-javascript": "6.2.5",
 		"@codemirror/language": "6.12.3",
 		"@codemirror/lint": "6.9.5",
@@ -39,7 +41,9 @@
 		"js-beautify": "2.0.3",
 		"jshint": "2.13.6",
 		"jshint-ja-edu": "github:takty/jshint-ja-edu",
-		"tern": "0.24.3"
+		"tern": "0.24.3",
+		"tree-sitter-java": "0.23.5",
+		"web-tree-sitter": "0.27.2"
 	},
 	"devDependencies": {
 		"esbuild": "^0.28.2",

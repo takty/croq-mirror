@@ -1,5 +1,5 @@
-import { Compartment, EditorState, Prec, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
-import { Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
+import { Compartment, EditorState, Prec, RangeSet, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
+import { Decoration, EditorView, GutterMarker, drawSelection, gutterLineClass, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
 import {
 	cursorDocEnd, cursorDocStart, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp,
 	defaultKeymap, deleteLine, history, historyKeymap, indentLess, insertTab,
@@ -15,6 +15,8 @@ import { refreshStructure, setStructure, structureView } from './extensions/stru
 import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber, refreshFunctionLineNumbers, sectionNumberState, setSectionStarts } from './extensions/function-line-numbers/index.js';
 import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
 import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
+import { setSyntaxHighlights } from './extensions/syntax-highlighting/index.js';
+import { bracketGutterOverlay } from './bracket-gutter-overlay.js';
 
 const TAB_SIZE = 4;
 const legacyKeymap = [
@@ -34,6 +36,25 @@ const setArgumentHint = StateEffect.define();
 const addHighlight = StateEffect.define();
 const removeHighlight = StateEffect.define();
 const hasNoSelection = view => view.state.selection.ranges.every(range => range.empty);
+
+const activeLineDecoration = Decoration.line({ class: 'cm-activeLine' });
+const activeLineGutterMarker = new class extends GutterMarker {
+	elementClass = 'cm-activeLineGutter';
+};
+const activeLines = state => {
+	if (state.selection.ranges.some(range => !range.empty)) return [];
+	return [...new Set(state.selection.ranges.map(range => state.doc.lineAt(range.head).from))].sort((a, b) => a - b);
+};
+const activeLineField = StateField.define({
+	create: activeLines,
+	update(value, transaction) {
+		return transaction.docChanged || transaction.selection ? activeLines(transaction.state) : value;
+	},
+	provide: field => [
+		EditorView.decorations.from(field, lines => Decoration.set(lines.map(line => activeLineDecoration.range(line)))),
+		gutterLineClass.from(field, lines => RangeSet.of(lines.map(line => activeLineGutterMarker.range(line)))),
+	],
+});
 
 const presentationField = StateField.define({
 	create: () => null,
@@ -132,8 +153,7 @@ export class Editor {
 				Prec.high(keymap.of([...customKeys, ...legacyKeymap])),
 				keymap.of([...closeBracketsKeymap, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
 				drawSelection({ cursorBlinkRate: 530 }),
-				highlightActiveLine(),
-				highlightActiveLineGutter(),
+				activeLineField,
 				highlightSelectionMatches(),
 				highlightWhitespace(),
 				EditorView.scrollMargins.of(() => ({ top: 32, bottom: 32 })),
@@ -149,6 +169,7 @@ export class Editor {
 				gutterLineSelection,
 				highlightField,
 				argumentHintField,
+				bracketGutterOverlay,
 				lintGutter(),
 				this.options.numbers.of(absoluteLineNumbers),
 				search({ top: true }),
@@ -408,11 +429,12 @@ export class Editor {
 	}
 
 	setPresentation(data) {
-		const { decorations = [], sectionStarts = [], ...presentation } = data ?? {};
+		const { decorations = [], sectionStarts = [], syntaxHighlights = [], ...presentation } = data ?? {};
 		this.view.dispatch({ effects: [
 			setPresentation.of(data ? presentation : null),
 			setStructure.of(decorations),
 			setSectionStarts.of(sectionStarts),
+			setSyntaxHighlights.of(syntaxHighlights),
 		] });
 		this.refresh();
 	}

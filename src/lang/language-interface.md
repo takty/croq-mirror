@@ -1,11 +1,13 @@
 # Internal language interface
 
 This is an internal boundary, not a public plugin API. `src/index.js` selects
-`javascriptLanguage` by default, or `plainLanguage` for `codeLanguage: null`.
+`javascriptLanguage` by default, `javaLanguage` for `codeLanguage: 'java'`, or
+`plainLanguage` for `codeLanguage: null`.
 The code language is selected at creation; display locale (`settings.language`,
 ja/en, default en) is independent and can change at runtime.
 Common implementation modules live directly in `src/`; JavaScript-specific
-modules live in `src/lang/js/`, with the inert implementation in `src/lang/plain/`. External library wrappers are generated in
+modules live in `src/lang/js/`, Java-specific modules in `src/lang/java/`, and
+the inert implementation in `src/lang/plain/`. External library wrappers are generated in
 `.build/lib/`. Splitting the vendor/build outputs is separate follow-up work.
 
 ## Ownership
@@ -23,6 +25,10 @@ modules live in `src/lang/js/`, with the inert implementation in `src/lang/plain
 - `gutterLineSelection`: an independent CodeMirror extension that handles gutter
   selection gestures and the line-selection cursor.
 - `indentRulers`: an independent CodeMirror extension for indentation guides.
+- `syntaxHighlightingExtension`: an independent extension that accepts syntax
+  ranges from a language adapter; Java supplies Tree-sitter results through
+  `setSyntaxHighlights`, while JavaScript supplies its Lezer results using
+  `syntaxHighlightingSource`.
 
 The language module receives no `Editor` instance or private fields. It must not
 replace document text; the view applies formatting results with its editing guards.
@@ -76,7 +82,7 @@ coordinate conventions.
   sectionStarts: [0, 12], // ordered zero-based section start lines
   decorations: [
     {
-      kind: 'range', from, to, fill,
+      kind: 'range', from, to, fill, opacity, // opacity is optional, default 1
       spineChars: 3, branchChars: 4,
       branches: [] // positions of intermediate range branches
     },
@@ -86,11 +92,24 @@ coordinate conventions.
 ```
 
 Decorations are drawn in array order. The adapter chooses colors, ranges and
-character spans; the structure extension converts positions to pixels and draws the shapes.
+character spans; the structure extension resolves `var(--property, fallback)`
+colors on repaint, converts positions to pixels and draws the shapes.
+JavaScript and Java provide class ranges using `--croq-mirror-l-red` at 15% opacity.
 Plain supplies `lineNumbers: 'absolute'` and empty decorations/section starts.
-Neither the renderer nor section numbering reads `fnLocs`, `ifLocs`, `constLocs`
-or any other JavaScript analysis field.
+Java supplies method and lambda section starts and structural decorations from
+Tree-sitter nodes. Neither the renderer nor section numbering reads `fnLocs`,
+`ifLocs`, `constLocs` or any other JavaScript analysis field.
 
 `setPresentation()` without an argument clears display data. Document edits and
 disabling automatic analysis clear the data; explicit analysis while disabled
 returns a snapshot without restoring the display.
+
+The syntax highlighting extension accepts `{ from, to, kind }` ranges using
+zero-based UTF-16 document offsets. The language adapter maps parser-specific
+positions before supplying them. By default the extension clears those ranges
+after document changes. Java opts into retaining mapped ranges between edits and
+uses its CodeMirror syntax tree to color uncovered positions until the worker
+returns fresh Tree-sitter token and lexical local-reference ranges. Loading a
+document clears retained ranges. JavaScript sends its syntax and local-reference
+ranges from its own synchronous Lezer analysis. Java diagnostics, completion, and
+formatting are not implemented yet.

@@ -2,12 +2,13 @@ import { Editor } from '../.build/editor-view.js';
 import { javascriptLanguage } from '../.build/lang/js/index.js';
 import { plainLanguage } from '../.build/lang/plain/index.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { setStructure, structureView } from '../dist/structure-view.js';
 import { functionLineNumbers, getSectionLineNumber, setSectionStarts } from '../dist/function-line-numbers.js';
 import { gutterLineSelection, setLineSelectionMode } from '../dist/gutter-line-selection.js';
 import { indentRulers } from '../dist/indent-rulers.js';
+import { setSyntaxHighlights, syntaxHighlightingExtension, syntaxHighlightingSource } from '../dist/syntax-highlighting.js';
 
 export async function runLanguageContractTests(assert) {
 	const ja = javascriptLanguage.diagnostics('var x = 1', 'ja', { esversion: 10, varstmt: true });
@@ -35,6 +36,11 @@ export async function runLanguageContractTests(assert) {
 	assert(branch.from.line === 2 && branch.branches[0].line === 2 && branch.from.ch === 1, 'presentation converts branch and range coordinates to zero-based positions');
 	assert(data.decorations.filter(item => item.kind === 'token').length === 2, 'declarations become generic token decorations');
 	assert(!javascriptLanguage.presentation(analyze('function unfinished( {')).canIndent, 'tolerant analysis does not authorize indentation');
+	const classData = javascriptLanguage.presentation(analyze('class Example {\n method() {}\n}'));
+	assert(classData.decorations[0].fill === 'var(--croq-mirror-l-red, #e61e58)' &&
+		classData.decorations[0].opacity === 0.15 && classData.decorations[0].from.line === 0 &&
+		classData.decorations[0].to.line === 2 && classData.decorations[1].fill === 'hsla(40, 100%, 50%, 0.15)',
+		'JavaScript class range precedes method decorations');
 
 	const host = document.createElement('div');
 	host.style.cssText = 'height:150px;width:500px';
@@ -77,6 +83,28 @@ export async function runLanguageContractTests(assert) {
 			spineChars: 3, branchChars: 4, branches: [{ line: 1, ch: 0 }],
 		}]) });
 		assert(await waitForPaint(true), 'standalone structure extension draws externally supplied ranges');
+		const classRange = [{
+			kind: 'range', from: { line: 0, ch: 0 }, to: { line: 2, ch: 1 },
+			fill: 'var(--test-class-color, #ff0000)', opacity: 0.15, spineChars: 3, branchChars: 4, branches: [],
+		}];
+		const hasColor = (red, blue) => {
+			const canvas = host.querySelector('canvas');
+			const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+			for (let i = 0; i < pixels.length; i += 4) {
+				if (pixels[i] === red && pixels[i + 2] === blue && pixels[i + 3] >= 37 && pixels[i + 3] <= 39) return true;
+			}
+			return false;
+		};
+		const waitForColor = async (red, blue) => {
+			for (let i = 0; i < 50 && !hasColor(red, blue); i++) await new Promise(resolve => setTimeout(resolve, 20));
+			return hasColor(red, blue);
+		};
+		standalone.dispatch({ effects: setStructure.of(classRange) });
+		assert(await waitForColor(255, 0), 'structure resolves CSS color fallback and paints the supplied opacity');
+		host.style.setProperty('--test-class-color', '#0000ff');
+		standalone.dispatch({ effects: setStructure.of([...classRange]) });
+		assert(await waitForColor(0, 255), 'structure resolves inherited CSS color on repaint');
+		host.style.removeProperty('--test-class-color');
 		const otherCanvas = otherHost.querySelector('canvas');
 		await new Promise(resolve => setTimeout(resolve, 100));
 		assert(otherCanvas.width && !otherCanvas.getContext('2d').getImageData(0, 0, otherCanvas.width, otherCanvas.height).data.some((value, i) => i % 4 === 3 && value),
@@ -234,7 +262,8 @@ export async function runLanguageContractTests(assert) {
 		lineMouse('mousedown', 2);
 		lineMouse('mousemove', 0);
 		lineMouse('mouseup', 0);
-		assert(selectionText() === 'one\ntwo\nthree\n' && !mode(), 'gutter dragging selects complete lines in reverse');
+		assert(selectionText() === 'one\ntwo\nthree\n' && !mode(),
+			'gutter dragging selects complete lines in reverse: ' + JSON.stringify(selectionText()) + ', mode=' + mode());
 		selectionView.dispatch({ effects: setLineSelectionMode.of(true) });
 		assert(mode(), 'host can set standalone line-selection mode');
 		selectionView.dispatch({ selection: { anchor: 0 } });
@@ -270,6 +299,110 @@ export async function runLanguageContractTests(assert) {
 	} finally {
 		selectionView.destroy();
 		selectionHost.remove();
+	}
+
+	const syntaxHost = document.createElement('div');
+	document.body.prepend(syntaxHost);
+	const syntaxCompartment = new Compartment();
+	const syntaxView = new EditorView({
+		state: EditorState.create({
+			doc: 'class Example',
+			extensions: [syntaxCompartment.of(syntaxHighlightingExtension)],
+		}),
+		parent: syntaxHost,
+	});
+	try {
+		syntaxHost.style.setProperty('--croq-syntax-keyword-color', '#123456');
+		syntaxView.dispatch({ effects: setSyntaxHighlights.of([{ from: 0, to: 5, kind: 'keyword' }, { from: 6, to: 13, kind: 'type' }]) });
+		const keyword = syntaxHost.querySelector('.cm-syntax-keyword');
+		const type = syntaxHost.querySelector('.cm-syntax-type');
+		assert(keyword?.textContent === 'class' && type?.textContent === 'Example' &&
+			getComputedStyle(keyword).color === 'rgb(18, 52, 86)',
+			'standalone syntax extension renders supplied token ranges and custom colors');
+		syntaxView.dispatch({ changes: { from: 0, insert: ' ' } });
+		assert(!syntaxHost.querySelector('.cm-syntax-keyword, .cm-syntax-type'),
+			'syntax highlighting clears stale ranges on document edits');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([
+			syntaxHighlightingExtension,
+			syntaxHighlightingSource(state => {
+				const from = state.doc.toString().indexOf('class');
+				return from < 0 ? [] : [{ from, to: from + 5, kind: 'local-reference' }];
+			}),
+		]) });
+		syntaxHost.style.setProperty('--croq-syntax-local-variable-color', '#234567');
+		const reference = syntaxHost.querySelector('.cm-syntax-local-reference');
+		assert(reference?.textContent === 'class' && getComputedStyle(reference).color === 'rgb(35, 69, 103)',
+			'standalone syntax source supplies ranges and supports local-reference color');
+		syntaxView.dispatch({ changes: { from: 1, to: 6, insert: 'other' } });
+		assert(!syntaxHost.querySelector('.cm-syntax-local-reference'),
+			'synchronous syntax source refreshes after edits');
+		syntaxView.dispatch({
+			changes: { from: 0, to: syntaxView.state.doc.length, insert: 'class Example' },
+			userEvent: 'load',
+			effects: syntaxCompartment.reconfigure([
+				syntaxHighlightingExtension,
+				syntaxHighlightingSource(state => {
+					const ranges = [];
+					for (const [text, kind] of [['class', 'keyword'], ['Example', 'type'], ['new', 'literal']]) {
+						const from = state.doc.toString().indexOf(text);
+						if (from >= 0) ranges.push({ from, to: from + text.length, kind });
+					}
+					return ranges;
+				}, () => false, { retainOnEdit: true }),
+			]),
+		});
+		syntaxView.dispatch({ effects: setSyntaxHighlights.of([
+			{ from: 0, to: 5, kind: 'comment' }, { from: 6, to: 13, kind: 'local-reference' },
+		]) });
+		assert(syntaxHost.querySelector('.cm-syntax-comment')?.textContent === 'class' &&
+			!syntaxHost.querySelector('.cm-syntax-keyword, .cm-syntax-type'),
+			'current supplied syntax takes priority over an interim source');
+		syntaxView.dispatch({ changes: { from: syntaxView.state.doc.length, insert: ' new' } });
+		assert(syntaxHost.querySelector('.cm-syntax-comment')?.textContent === 'class' &&
+			syntaxHost.querySelector('.cm-syntax-local-reference')?.textContent === 'Example' &&
+			syntaxHost.querySelector('.cm-syntax-literal')?.textContent === 'new',
+			'retained syntax survives edits while the interim source colors uncovered text');
+		syntaxView.dispatch({ effects: setSyntaxHighlights.of([
+			{ from: 0, to: 5, kind: 'keyword' }, { from: 6, to: 13, kind: 'type' },
+		]) });
+		assert(syntaxHost.querySelector('.cm-syntax-keyword')?.textContent === 'class' &&
+			!syntaxHost.querySelector('.cm-syntax-comment, .cm-syntax-local-reference, .cm-syntax-literal'),
+			'fresh supplied syntax replaces retained and interim decorations');
+		syntaxView.dispatch({
+			changes: { from: 0, to: syntaxView.state.doc.length, insert: 'class Example' },
+			userEvent: 'load',
+		});
+		assert(syntaxHost.querySelector('.cm-syntax-keyword')?.textContent === 'class' &&
+			syntaxHost.querySelector('.cm-syntax-type')?.textContent === 'Example',
+			'loading clears retained syntax and restores the interim source');
+		syntaxView.dispatch({
+			changes: { from: 0, to: syntaxView.state.doc.length, insert: 'word\nold' },
+			userEvent: 'load',
+			effects: syntaxCompartment.reconfigure([
+				syntaxHighlightingExtension,
+				syntaxHighlightingSource(state => {
+					const line = state.doc.line(1);
+					return line.text.startsWith('//') ? [{ from: line.from, to: line.to, kind: 'comment' }] : [];
+				}, () => false, { retainOnEdit: true, reconcileComments: state => state.doc.line(1).to }),
+			]),
+		});
+		syntaxView.dispatch({ effects: setSyntaxHighlights.of([
+			{ from: 0, to: 4, kind: 'keyword' }, { from: 5, to: 8, kind: 'comment' },
+		]) });
+		syntaxView.dispatch({ changes: { from: 0, insert: '//' } });
+		assert([...syntaxHost.querySelectorAll('.cm-syntax-comment')].map(node => node.textContent).join('|') ===
+			'//word|old' && !syntaxHost.querySelector('.cm-syntax-keyword'),
+			'current comments override retained code without clearing comments beyond the parsed region');
+		syntaxView.dispatch({ changes: { from: 0, to: 2 } });
+		assert(syntaxHost.querySelector('.cm-syntax-keyword')?.textContent === 'word' &&
+			syntaxHost.querySelector('.cm-syntax-comment')?.textContent === 'old',
+			'removing a provisional comment restores retained code and preserves unparsed comments');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([]) });
+		assert(!syntaxHost.querySelector('style'),
+			'removing syntax highlighting removes its stylesheet');
+	} finally {
+		syntaxView.destroy();
+		syntaxHost.remove();
 	}
 
 	const rulerHost = document.createElement('div');
@@ -382,6 +515,25 @@ export async function runLanguageContractTests(assert) {
 		const diagnostics = () => [{ from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, severity: 'error', message: 'Generic diagnostic' }];
 		view.setOptions(settings, {}, diagnostics);
 		view.loadDocument('abc\ndef\nghi');
+		view.view.focus();
+		const activeLines = () => [...root.querySelectorAll('.cm-content .cm-activeLine')];
+		const activeGutters = () => [...root.querySelectorAll('.cm-sectionNumbers .cm-activeLineGutter')];
+		assert(activeLines().length === 1 && activeGutters().length === 1,
+			'collapsed selection highlights the current line and section gutter');
+		for (const selection of [
+			EditorSelection.single(0, 2), EditorSelection.single(8, 1),
+			EditorSelection.create([EditorSelection.range(0, 2), EditorSelection.cursor(5)]),
+		]) {
+			view.view.dispatch({ selection });
+			assert(!activeLines().length && !activeGutters().length,
+				'any nonempty selection hides active-line and gutter highlighting');
+		}
+		view.view.dispatch({ selection: EditorSelection.create([EditorSelection.cursor(0), EditorSelection.cursor(5)]) });
+		assert(activeLines().length === 2 && activeGutters().length === 2,
+			'multiple empty cursors highlight their respective lines and gutters');
+		view.view.dispatch({ selection: { anchor: 4 } });
+		assert(activeLines().length === 1 && activeLines()[0].textContent === 'def' && activeGutters().length === 1,
+			'collapsing a selection restores the current line and gutter');
 		view.setDefinitions(['opaque definition']);
 		assert(definitions[0] === 'opaque definition', 'view forwards definitions without interpreting them');
 		view.setPresentation({

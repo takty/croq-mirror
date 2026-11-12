@@ -17,6 +17,14 @@ test('strict and tolerant results retain the existing coordinate contract', () =
 	assert.equal('ast' in valid, false);
 });
 
+test('JavaScript analysis reports class declarations and expressions', () => {
+	const result = analyze('class Outer {\n method() { return class Inner {}; }\n}\nconst Other = class {};\n');
+	assert.equal(result.success, true);
+	assert.deepEqual(result.classLocs.map(([from, to]) => [from.line, from.column, to.line, to.column]),
+		[[1, 0, 3, 1], [2, 19, 2, 33], [4, 14, 4, 22]]);
+	assert.deepEqual(result.fnStarts, [1]);
+});
+
 class WorkerMock {
 	sent = [];
 	terminated = false;

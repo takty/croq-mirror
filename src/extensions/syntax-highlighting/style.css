@@ -1,0 +1,67 @@
+.cm-editor.cm-syntax-highlighting .cm-syntax-comment {
+	color: var(--croq-syntax-comment-color, var(--croq-mirror-l-gray, #777));
+	font-weight: var(--croq-syntax-comment-font-weight, bold);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-keyword {
+	color: var(--croq-syntax-keyword-color, var(--croq-mirror-l-bodybrown, #7c6a5a));
+	font-weight: var(--croq-syntax-keyword-font-weight, bold);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-operator {
+	font-weight: var(--croq-syntax-keyword-font-weight, bold);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-type {
+	color: var(--croq-syntax-type-color, var(--croq-mirror-l-blue, #2e449a));
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-function {
+	color: var(--croq-syntax-function-color, var(--croq-mirror-l-turquoise, #005363));
+}
+
+.cm-editor.cm-syntax-highlighting :where(.cm-syntax-definition) {
+	color: var(--croq-syntax-definition-color, inherit);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-definition {
+	font-weight: var(--croq-syntax-definition-font-weight, bold);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-property {
+	color: var(--croq-syntax-property-color, var(--croq-mirror-l-blue, #2e449a));
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-variable {
+	color: var(--croq-syntax-variable-color, inherit);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-literal {
+	color: var(--croq-syntax-literal-color, var(--croq-mirror-l-orange, #f5a200));
+	font-weight: var(--croq-syntax-literal-font-weight, bold);
+	text-shadow: var(--croq-syntax-literal-text-shadow, var(--croq-mirror-l-yellow, #fdde00) 0 0 0.25em);
+}
+
+.cm-editor.cm-syntax-highlighting .cm-activeLine .cm-syntax-literal {
+	text-shadow: none;
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-invalid {
+	text-decoration: var(--croq-syntax-invalid-decoration, underline wavy var(--croq-mirror-l-red, #e61e58));
+}
+
+.cm-editor.cm-syntax-highlighting :is(.cm-syntax-local-variable, .cm-syntax-local-reference, .cm-syntax-local-reference .cm-syntax-variable) {
+	color: var(--croq-syntax-local-variable-color, hsl(86 60% 30%));
+}
+
+.cm-editor.cm-syntax-highlighting .cm-syntax-variable-reference {
+	border-radius: var(--croq-syntax-reference-radius, 0 0.35em 0.35em 0);
+	box-shadow: var(--croq-syntax-reference-shadow, 0 2px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent), 0 -1px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent));
+	background-color: var(--croq-syntax-reference-background, color-mix(in srgb, var(--croq-mirror-color-editor, #fdfdf9) 95%, transparent));
+}
+
+.cm-editor.cm-syntax-highlighting .cm-activeLine .cm-syntax-variable-reference {
+	border-radius: 0;
+	box-shadow: none;
+	background-color: transparent;
+}

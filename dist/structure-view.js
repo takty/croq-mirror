@@ -67,7 +67,13 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     const scroller = view.scrollDOM;
     const frame = scroller.getBoundingClientRect();
     const content = view.contentDOM.getBoundingClientRect();
-    const linePadding = parseFloat(view.dom.ownerDocument.defaultView.getComputedStyle(view.contentDOM).getPropertyValue("--croq-mirror-line-padding")) || 0;
+    const window = view.dom.ownerDocument.defaultView;
+    const colors = window.getComputedStyle(view.dom);
+    const resolveColor = (value) => {
+      const match = /^var\(\s*(--[\w-]+)\s*,\s*(.+)\)$/.exec(value);
+      return match ? colors.getPropertyValue(match[1]).trim() || match[2] : value;
+    };
+    const linePadding = parseFloat(window.getComputedStyle(view.contentDOM).getPropertyValue("--croq-mirror-line-padding")) || 0;
     const left = Math.max(frame.left, content.left);
     const width = Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left));
     const height = scroller.clientHeight;
@@ -89,9 +95,11 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     const decorations = view.state.field(structureField).map((item) => {
       const start = coords(item.from);
       const end = coords(item.to, -1);
-      if (item.kind === "token") return { ...item, start, end };
+      const fill2 = resolveColor(item.fill);
+      if (item.kind === "token") return { ...item, fill: fill2, stroke: resolveColor(item.stroke), start, end };
       return {
         ...item,
+        fill: fill2,
         start,
         end,
         spine: coords({ ...item.from, ch: item.from.ch + item.spineChars + 1 }, -1).x - start.x - item.spineChars,
@@ -140,6 +148,7 @@ function drawStructure(canvas, { width, height, charWidth, lineHeight, decoratio
   const band = lineHeight - padding * 2;
   for (const item of decorations) {
     const { start, end } = item;
+    ctx.globalAlpha = item.opacity ?? 1;
     ctx.fillStyle = item.fill;
     if (item.kind === "range") {
       const left = start.x + 4;
@@ -170,6 +179,7 @@ function drawStructure(canvas, { width, height, charWidth, lineHeight, decoratio
         ctx.stroke();
       }
     }
+    ctx.globalAlpha = 1;
   }
 }
 function fill(ctx, x, y, width, height, radii) {

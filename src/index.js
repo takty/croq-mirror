@@ -2,6 +2,7 @@ import { EditorSelection } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { Editor, offsetAt, positionAt } from './editor-view.js';
 import { javascriptLanguage } from './lang/js/index.js';
+import { javaLanguage } from './lang/java/index.js';
 import { plainLanguage } from './lang/plain/index.js';
 import english from './res/lang.en.json';
 import japanese from './res/lang.ja.json';
@@ -34,7 +35,7 @@ function validate(options) {
 	for (const [key, value] of Object.entries(options)) {
 		if (!(key in DEFAULT_SETTINGS)) throw new TypeError(`Unknown setting: ${key}`);
 		if (key === 'codeLanguage') {
-			if (value !== null && value !== 'javascript') throw new TypeError('codeLanguage must be javascript or null');
+			if (value !== null && !['javascript', 'java'].includes(value)) throw new TypeError('codeLanguage must be javascript, java, or null');
 			continue;
 		}
 		if (typeof value !== typeof DEFAULT_SETTINGS[key]) throw new TypeError(`Invalid setting: ${key}`);
@@ -58,7 +59,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	const root = document.createElement('div');
 	root.className = 'croq-mirror';
 	container.append(root);
-	const language = options.codeLanguage === null ? plainLanguage : javascriptLanguage;
+	const language = options.codeLanguage === null ? plainLanguage : options.codeLanguage === 'java' ? javaLanguage : javascriptLanguage;
 	let view, client, observer, timer, destroyed = false;
 	let settings = { ...DEFAULT_SETTINGS, ...options };
 	let version      = 0;
