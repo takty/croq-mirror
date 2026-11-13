@@ -448,7 +448,7 @@ export async function runLanguageContractTests(assert) {
 	const syntaxView = new EditorView({
 		state: EditorState.create({
 			doc: 'class Example',
-			extensions: [syntaxCompartment.of(syntaxHighlightingExtension)],
+			extensions: [commonAnalysisState, syntaxCompartment.of(syntaxHighlightingExtension)],
 		}),
 		parent: syntaxHost,
 	});
@@ -560,6 +560,34 @@ export async function runLanguageContractTests(assert) {
 		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([]) });
 		assert(!syntaxHost.querySelector('style'),
 			'removing syntax highlighting removes its stylesheet');
+		syntaxView.dispatch({
+			changes: { from: 0, to: syntaxView.state.doc.length, insert: 'class Example' },
+			userEvent: 'load',
+		});
+		syntaxView.dispatch({ effects: setCommonAnalysis.of({
+			version: 1, sourceLength: 13, complete: true, structures: [], declarations: [],
+			syntax: [{ from: 0, to: 5, kind: 'keyword' }], references: [
+				{ from: 6, to: 13, role: 'definition', scope: 'unknown' },
+			], sections: [],
+		}) });
+		const enabledSyntax = [
+			syntaxHighlightingExtension, syntaxHighlightingOptions({ syntax: true, semantic: true }),
+		];
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure(enabledSyntax) });
+		const restoredKeyword = syntaxHost.querySelector('.cm-syntax-keyword')?.textContent;
+		const restoredDefinition = syntaxHost.querySelector('.cm-syntax-definition')?.textContent;
+		assert(restoredKeyword === 'class' && restoredDefinition === 'Example',
+			`re-enabling syntax and semantic highlighting restores current common analysis immediately (${restoredKeyword}, ${restoredDefinition})`);
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([
+			syntaxHighlightingExtension, syntaxHighlightingOptions({ syntax: false, semantic: true }),
+		]) });
+		assert(!syntaxHost.querySelector('.cm-syntax-keyword') && syntaxHost.querySelector('.cm-syntax-definition'),
+			'semantic highlights restore independently from common analysis');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([]) });
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure(enabledSyntax) });
+		assert(syntaxHost.querySelector('.cm-syntax-keyword')?.textContent === 'class' &&
+			syntaxHost.querySelector('.cm-syntax-definition')?.textContent === 'Example',
+			're-adding the extension reconstructs decorations from the existing common snapshot');
 	} finally {
 		syntaxView.destroy();
 		syntaxHost.remove();
@@ -679,7 +707,8 @@ export async function runLanguageContractTests(assert) {
 			disabled: false, readOnly: false,
 		};
 		const diagnostics = () => [{ from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, severity: 'error', message: 'Generic diagnostic' }];
-		view.setOptions(settings, {}, diagnostics);
+		const phrases = {};
+		view.setOptions(settings, phrases, diagnostics);
 		view.loadDocument('abc\ndef\nghi');
 		view.view.focus();
 		const activeLines = () => [...root.querySelectorAll('.cm-content .cm-activeLine')];
@@ -710,16 +739,23 @@ export async function runLanguageContractTests(assert) {
 		}));
 		assert(view.getSectionLineNumber(0).join() === '0,1' && view.getSectionLineNumber(2).join() === '1,2', 'view numbers sections from language-neutral data');
 		assert(root.querySelector('.cm-function-number')?.textContent === '1', 'view renders section start markers');
-		view.setOptions({ ...settings, functionLineNumbers: false }, {}, diagnostics);
+		view.setOptions({ ...settings, functionLineNumbers: false }, phrases, diagnostics);
 		assert(view.getSectionLineNumber(2).join() === '1,2' && root.querySelector('.cm-lineNumbers'),
 			'section data remains available while ordinary numbering is displayed');
-		view.setOptions(settings, {}, diagnostics);
+		view.setOptions(settings, phrases, diagnostics);
 		assert(root.querySelector('.cm-function-number')?.textContent === '1',
 			'switching back restores the current section numbering');
 		await new Promise(resolve => setTimeout(resolve, 450));
 		const canvas = root.querySelector('canvas');
 		assert(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value),
 			'view draws structure and declaration data from shared analysis');
+		view.setOptions({ ...settings, functionScrollMarkers: true }, phrases, diagnostics);
+		const scrollMarkers = root.querySelector('.cm-function-scroll-markers');
+		const canvasAfterMarkerChange = root.querySelector('canvas');
+		view.setOptions({ ...settings, functionScrollMarkers: true, fontSize: 18 }, phrases, diagnostics);
+		assert(scrollMarkers && root.querySelector('.cm-function-scroll-markers') === scrollMarkers &&
+			root.querySelector('canvas') === canvasAfterMarkerChange,
+			`font-only settings preserve existing marker and canvas plugin instances (marker=${!!scrollMarkers}/${root.querySelector('.cm-function-scroll-markers') === scrollMarkers}, canvas=${root.querySelector('canvas') === canvasAfterMarkerChange})`);
 		await new Promise(resolve => setTimeout(resolve, 200));
 		assert(root.querySelector('.cm-lint-marker-error'), 'view renders generic diagnostics');
 		view.view.dispatch({ selection: { anchor: 3 } });
@@ -729,7 +765,7 @@ export async function runLanguageContractTests(assert) {
 		view.closeCompletion();
 		view.format();
 		assert(view.view.state.doc.line(1).text === 'ABC', 'view applies language formatting result');
-		view.setOptions({ ...settings, readOnly: true }, {}, diagnostics);
+		view.setOptions({ ...settings, readOnly: true }, phrases, diagnostics);
 		view.view.dispatch({ selection: { anchor: 7 } });
 		view.format();
 		assert(view.view.state.doc.line(2).text === 'def', 'read-only blocks language formatting edits');

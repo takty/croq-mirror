@@ -1,9 +1,9 @@
-// src/extensions/syntax-highlighting/index.js
+// .build/extensions/syntax-highlighting/index.js
 import { Facet, RangeSet, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
 import { commonAnalysisState } from "croq-mirror/analysis";
 
-// src/extensions/styles.js
+// .build/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
 function extensionStyles(css) {
   return ViewPlugin.fromClass(class {
@@ -24,10 +24,10 @@ function extensionStyles(css) {
   });
 }
 
-// src/extensions/syntax-highlighting/style.css
+// .build/extensions/syntax-highlighting/style.css
 var style_default = ".cm-editor.cm-syntax-highlighting .cm-syntax-comment {\r\n	color: var(--croq-syntax-comment-color, var(--croq-mirror-l-gray, #777));\r\n	font-weight: var(--croq-syntax-comment-font-weight, bold);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-keyword {\r\n	color: var(--croq-syntax-keyword-color, var(--croq-mirror-l-bodybrown, #7c6a5a));\r\n	font-weight: var(--croq-syntax-keyword-font-weight, bold);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-operator {\r\n	font-weight: var(--croq-syntax-keyword-font-weight, bold);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-type {\r\n	color: var(--croq-syntax-type-color, var(--croq-mirror-l-blue, #2e449a));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-function {\r\n	color: var(--croq-syntax-function-color, var(--croq-mirror-l-turquoise, #005363));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting :where(.cm-syntax-definition) {\r\n	color: var(--croq-syntax-definition-color, inherit);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-definition {\r\n	font-weight: var(--croq-syntax-definition-font-weight, bold);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-property {\r\n	color: var(--croq-syntax-property-color, var(--croq-mirror-l-blue, #2e449a));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-variable {\r\n	color: var(--croq-syntax-variable-color, inherit);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-literal {\r\n	color: var(--croq-syntax-literal-color, var(--croq-mirror-l-orange, #f5a200));\r\n	font-weight: var(--croq-syntax-literal-font-weight, bold);\r\n	text-shadow: var(--croq-syntax-literal-text-shadow, var(--croq-mirror-l-yellow, #fdde00) 0 0 0.25em);\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-activeLine .cm-syntax-literal {\r\n	text-shadow: none;\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-invalid {\r\n	text-decoration: var(--croq-syntax-invalid-decoration, underline wavy var(--croq-mirror-l-red, #e61e58));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting :is(.cm-syntax-local-variable, .cm-syntax-local-reference, .cm-syntax-local-reference .cm-syntax-variable) {\r\n	color: var(--croq-syntax-local-variable-color, hsl(86 60% 30%));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-syntax-variable-reference {\r\n	border-radius: var(--croq-syntax-reference-radius, 0 0.35em 0.35em 0);\r\n	box-shadow: var(--croq-syntax-reference-shadow, 0 2px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent), 0 -1px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent));\r\n	background-color: var(--croq-syntax-reference-background, color-mix(in srgb, var(--croq-mirror-color-editor, #fdfdf9) 95%, transparent));\r\n}\r\n\r\n.cm-editor.cm-syntax-highlighting .cm-activeLine .cm-syntax-variable-reference {\r\n	border-radius: 0;\r\n	box-shadow: none;\r\n	background-color: transparent;\r\n}\r\n";
 
-// src/extensions/syntax-highlighting/index.js
+// .build/extensions/syntax-highlighting/index.js
 var syntaxKinds = /* @__PURE__ */ new Set([
   "comment",
   "keyword",
@@ -95,15 +95,16 @@ function decorationsFor(ranges, doc, options) {
   }), true);
 }
 var syntaxHighlights = StateField.define({
-  create: () => ({ decorations: Decoration.none, current: false, ranges: [] }),
+  create: () => ({ decorations: Decoration.none, current: false, explicit: false, ranges: [] }),
   update(value, transaction) {
     if (transaction.isUserEvent("load")) {
-      value = { decorations: Decoration.none, current: false, ranges: [] };
+      value = { decorations: Decoration.none, current: false, explicit: false, ranges: [] };
     } else if (transaction.docChanged) {
       const retain = transaction.state.facet(sourceFacet)?.retainOnEdit;
       value = {
         decorations: retain ? value.decorations.map(transaction.changes) : Decoration.none,
         current: false,
+        explicit: false,
         ranges: retain ? value.ranges.map((range) => ({
           ...range,
           from: transaction.changes.mapPos(range.from, 1),
@@ -119,13 +120,15 @@ var syntaxHighlights = StateField.define({
       value = {
         decorations: decorationsFor(ranges, transaction.newDoc, options),
         current: !!common && !common.stale,
+        explicit: false,
         ranges
       };
     } else if (transaction.startState.facet(displayOptions) !== options) {
-      const ranges = common ? commonRanges(common, options) : value.ranges;
+      const ranges = common && !value.explicit ? commonRanges(common, options) : value.ranges;
       value = {
         decorations: decorationsFor(ranges, transaction.newDoc, options),
-        current: value.current && !!common && !common.stale,
+        current: value.explicit ? value.current : value.current && !!common && !common.stale,
+        explicit: value.explicit,
         ranges
       };
     }
@@ -135,6 +138,7 @@ var syntaxHighlights = StateField.define({
       value = {
         decorations: decorationsFor(ranges, transaction.newDoc, options),
         current: ranges.length > 0,
+        explicit: true,
         ranges: ranges.slice()
       };
     }
@@ -187,7 +191,11 @@ function sourceDecorations(state, source) {
   const supplied = state.field(syntaxHighlights);
   const common = state.field(commonAnalysisState, false);
   const options = state.facet(displayOptions);
-  if (!source || common && !common.stale || source.retainOnEdit && supplied.current) return supplied.decorations;
+  if (supplied.explicit) return supplied.decorations;
+  if (common && !common.stale) {
+    return supplied.current ? supplied.decorations : decorationsFor(commonRanges(common, options), state.doc, options);
+  }
+  if (!source || source.retainOnEdit && supplied.current) return supplied.decorations;
   const ranges = source.analyze(state);
   if (!source.retainOnEdit) return decorationsFor(ranges, state.doc, options);
   const retained = source.reconcileComments ? reconcileRetainedComments(supplied.decorations, activeRanges(ranges, options), state.doc, source.reconcileComments(state)) : supplied.decorations;

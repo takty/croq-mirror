@@ -125,6 +125,9 @@ parse. The `analysis` setting controls worker parsing and shared data, while eac
 display setting controls only its corresponding presentation; synchronous
 CodeMirror syntax sources may continue to provide interim coloring. Function
 markers are independent of function line numbers.
+Earlier versions enabled function-position markers together with
+`functionLineNumbers: true`. To keep both displays after upgrading, set
+`functionLineNumbers: true` and `functionScrollMarkers: true`.
 
 ```js
 const editor = await createEditor(container, { codeLanguage: null });

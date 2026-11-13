@@ -125,6 +125,7 @@ export class Editor {
 			diagnostics: new Compartment(),
 			rulers: new Compartment(),
 		};
+		this.optionState = null;
 		const customKeys = [
 			{ key: 'Ctrl-\\', run: () => this.complete() },
 			{ key: 'Ctrl-Tab', run: () => this.complete() },
@@ -236,40 +237,79 @@ export class Editor {
 		view.dom.style.fontSize = settings.fontSize + 'px';
 		view.dom.style.lineHeight = settings.lineHeight + '%';
 		if (!this.canComplete()) this.closeCompletion();
-		view.dispatch({ effects: [
-			this.options.phrases.reconfigure(EditorState.phrases.of(phrases)),
-			this.options.wrapping.reconfigure(settings.lineWrapping ? EditorView.lineWrapping : []),
-			this.options.rulers.reconfigure(settings.rulers ? indentRulers : []),
-			this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers),
-			this.options.structure.reconfigure(settings.structureHighlight || settings.declarationHighlight ? [
+		const previous = this.optionState ?? {};
+		const effects = [];
+		const diagnosticsChanged = previous.diagnosticSource !== diagnosticSource;
+		if (previous.phrases !== phrases) effects.push(this.options.phrases.reconfigure(EditorState.phrases.of(phrases)));
+		if (previous.lineWrapping !== settings.lineWrapping) {
+			effects.push(this.options.wrapping.reconfigure(settings.lineWrapping ? EditorView.lineWrapping : []));
+		}
+		if (previous.rulers !== settings.rulers) {
+			effects.push(this.options.rulers.reconfigure(settings.rulers ? indentRulers : []));
+		}
+		if (previous.sectionNumbers !== this.sectionNumbers) {
+			effects.push(this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers));
+		}
+		if (previous.structureHighlight !== settings.structureHighlight ||
+			previous.declarationHighlight !== settings.declarationHighlight) {
+			effects.push(this.options.structure.reconfigure(settings.structureHighlight || settings.declarationHighlight ? [
 				structureView,
 				structureViewOptions({
 					structures: settings.structureHighlight,
 					declarations: settings.declarationHighlight,
 				}),
-			] : []),
-			this.options.syntax.reconfigure(settings.syntaxHighlight || settings.semanticHighlight ? [
+			] : []));
+		}
+		if (previous.syntaxHighlight !== settings.syntaxHighlight ||
+			previous.semanticHighlight !== settings.semanticHighlight) {
+			effects.push(this.options.syntax.reconfigure(settings.syntaxHighlight || settings.semanticHighlight ? [
 				syntaxHighlightingExtension,
 				syntaxHighlightingOptions({ syntax: settings.syntaxHighlight, semantic: settings.semanticHighlight }),
-			] : []),
-			this.options.functionMarkers.reconfigure(this.functionMarkers ? functionScrollMarkers : []),
-			this.options.brackets.reconfigure(settings.bracketMatching && this.language.supportsBracketMatching
-				? bracketMatchingExtension : []),
-			this.options.access.reconfigure([
+			] : []));
+		}
+		if (previous.functionMarkers !== this.functionMarkers) {
+			effects.push(this.options.functionMarkers.reconfigure(this.functionMarkers ? functionScrollMarkers : []));
+		}
+		const bracketsEnabled = settings.bracketMatching && this.language.supportsBracketMatching;
+		if (previous.bracketsEnabled !== bracketsEnabled) {
+			effects.push(this.options.brackets.reconfigure(bracketsEnabled ? bracketMatchingExtension : []));
+		}
+		if (previous.readOnly !== this.readOnly || previous.enabled !== this.enabled) {
+			effects.push(this.options.access.reconfigure([
 				EditorState.readOnly.of(this.readOnly || !this.enabled),
 				EditorView.editable.of(this.enabled),
 				EditorView.contentAttributes.of({ 'aria-readonly': String(this.readOnly || !this.enabled) }),
-			]),
-			this.options.diagnostics.reconfigure(diagnosticSource ? linter(stateView => {
+			]));
+		}
+		if (diagnosticsChanged) {
+			effects.push(this.options.diagnostics.reconfigure(diagnosticSource ? linter(stateView => {
 				const { doc } = stateView.state;
 				return diagnosticSource(doc.toString()).filter(item => item.from.line < doc.lines).map(item => {
 					const from = offsetAt(doc, item.from);
 					return { from, to: Math.max(from, offsetAt(doc, item.to)), severity: item.severity, message: item.message };
 				});
-			}, { delay: 500, needsRefresh: update => update.startState.facet(EditorState.phrases) !== update.state.facet(EditorState.phrases) }) : []),
-		] });
-		if (diagnosticSource) forceLinting(view);
-		else view.dispatch(setDiagnostics(view.state, []));
+			}, { delay: 500, needsRefresh: update => update.startState.facet(EditorState.phrases) !== update.state.facet(EditorState.phrases) }) : []));
+		}
+		if (effects.length) view.dispatch({ effects });
+		if (diagnosticsChanged) {
+			if (diagnosticSource) forceLinting(view);
+			else view.dispatch(setDiagnostics(view.state, []));
+		}
+		this.optionState = {
+			phrases,
+			lineWrapping: settings.lineWrapping,
+			rulers: settings.rulers,
+			sectionNumbers: this.sectionNumbers,
+			structureHighlight: settings.structureHighlight,
+			declarationHighlight: settings.declarationHighlight,
+			syntaxHighlight: settings.syntaxHighlight,
+			semanticHighlight: settings.semanticHighlight,
+			functionMarkers: this.functionMarkers,
+			bracketsEnabled,
+			readOnly: this.readOnly,
+			enabled: this.enabled,
+			diagnosticSource,
+		};
 		if (reopenSearch && this.enabled) openSearchPanel(view);
 		this.refresh();
 	}

@@ -115,7 +115,7 @@ export const commonAnalysisState = StateField.define({
 			if (next.sourceLength !== transaction.newDoc.length) {
 				throw new RangeError('Common analysis does not match the document length');
 			}
-			if (value && next.version < value.version) continue;
+			if (value && (next.version < value.version || (value.stale && next.version <= value.version))) continue;
 			value = next;
 		}
 		return value;
@@ -127,7 +127,9 @@ function mapAnalysis(analysis, transaction) {
 		let affected = false;
 		transaction.changes.iterChanges((from, to, newFrom, newTo) => {
 			if (from === to) {
-				if (discardInterior && from > range.from && from < range.to &&
+				if (discardInterior && (preserveLayout
+					? from > range.from && from < range.to
+					: from >= range.from && from <= range.to) &&
 					(!preserveLayout || !isSafeLayoutInsertion(transaction, from, newFrom, newTo))) affected = true;
 			} else if (from < range.to && to > range.from) {
 				affected = true;

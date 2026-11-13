@@ -68,6 +68,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	const language = options.codeLanguage === null ? plainLanguage : options.codeLanguage === 'java' ? javaLanguage : javascriptLanguage;
 	let view, client, observer, timer, destroyed = false;
 	let settings = { ...DEFAULT_SETTINGS, ...options };
+	const diagnosticSource = text => language.diagnostics(text, settings.language);
 	let version      = 0;
 	let analysis     = null;
 	let loading      = false;
@@ -134,9 +135,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			if (settings.disabled) cm.contentDOM.blur();
 			root.inert = settings.disabled;
 			root.setAttribute('aria-disabled', String(settings.disabled));
-			view.setOptions(settings, LANGUAGES[settings.language].editorPhrase, settings.diagnostics
-				? text => language.diagnostics(text, settings.language)
-				: null);
+			view.setOptions(settings, LANGUAGES[settings.language].editorPhrase, settings.diagnostics ? diagnosticSource : null);
 		}
 
 		function schedule() {

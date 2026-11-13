@@ -82,7 +82,11 @@ partial data available, not parser-specific node names.
 
 The shared snapshot lives in the per-editor `commonAnalysisState` field.
 Unchanged ranges may be mapped across edits and marked `stale` until the next
-version-checked worker result arrives. A document load clears the snapshot.
+version-checked worker result arrives. After an edit, the replacement result
+must carry a strictly newer document version; a result at the mapped snapshot's
+version is rejected even when the edited document has the same length.
+Standalone publishers should use monotonically increasing document revisions.
+A document load clears the snapshot.
 Disabling `analysis` clears parser data; changing display settings does not
 schedule another parse. Public `getAnalysis()` and `analysis` event shapes do
 not include the internal common snapshot and remain compatible.

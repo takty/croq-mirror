@@ -57,15 +57,16 @@ function decorationsFor(ranges, doc, options) {
 }
 
 const syntaxHighlights = StateField.define({
-	create: () => ({ decorations: Decoration.none, current: false, ranges: [] }),
+	create: () => ({ decorations: Decoration.none, current: false, explicit: false, ranges: [] }),
 	update(value, transaction) {
 		if (transaction.isUserEvent('load')) {
-			value = { decorations: Decoration.none, current: false, ranges: [] };
+			value = { decorations: Decoration.none, current: false, explicit: false, ranges: [] };
 		} else if (transaction.docChanged) {
 			const retain = transaction.state.facet(sourceFacet)?.retainOnEdit;
 			value = {
 				decorations: retain ? value.decorations.map(transaction.changes) : Decoration.none,
 				current: false,
+				explicit: false,
 				ranges: retain ? value.ranges.map(range => ({
 					...range,
 					from: transaction.changes.mapPos(range.from, 1),
@@ -81,13 +82,15 @@ const syntaxHighlights = StateField.define({
 			value = {
 				decorations: decorationsFor(ranges, transaction.newDoc, options),
 				current: !!common && !common.stale,
+				explicit: false,
 				ranges,
 			};
 		} else if (transaction.startState.facet(displayOptions) !== options) {
-			const ranges = common ? commonRanges(common, options) : value.ranges;
+			const ranges = common && !value.explicit ? commonRanges(common, options) : value.ranges;
 			value = {
 				decorations: decorationsFor(ranges, transaction.newDoc, options),
-				current: value.current && !!common && !common.stale,
+				current: value.explicit ? value.current : value.current && !!common && !common.stale,
+				explicit: value.explicit,
 				ranges,
 			};
 		}
@@ -97,6 +100,7 @@ const syntaxHighlights = StateField.define({
 			value = {
 				decorations: decorationsFor(ranges, transaction.newDoc, options),
 				current: ranges.length > 0,
+				explicit: true,
 				ranges: ranges.slice(),
 			};
 		}
@@ -153,7 +157,11 @@ function sourceDecorations(state, source) {
 	const supplied = state.field(syntaxHighlights);
 	const common = state.field(commonAnalysisState, false);
 	const options = state.facet(displayOptions);
-	if (!source || (common && !common.stale) || (source.retainOnEdit && supplied.current)) return supplied.decorations;
+	if (supplied.explicit) return supplied.decorations;
+	if (common && !common.stale) {
+		return supplied.current ? supplied.decorations : decorationsFor(commonRanges(common, options), state.doc, options);
+	}
+	if (!source || (source.retainOnEdit && supplied.current)) return supplied.decorations;
 	const ranges = source.analyze(state);
 	if (!source.retainOnEdit) return decorationsFor(ranges, state.doc, options);
 	const retained = source.reconcileComments

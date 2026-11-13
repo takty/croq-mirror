@@ -70,6 +70,36 @@ test('shared analysis state validates ranges, rejects older versions and maps us
 	assert.equal(state.field(commonAnalysisState), null);
 });
 
+test('shared analysis invalidates token ranges at insertion boundaries and rejects stale revisions', () => {
+	const make = version => createCommonAnalysis({
+		version, sourceLength: 3, complete: true, structures: [],
+		declarations: [{ kind: 'variable', from: 1, to: 2, mutability: 'mutable', scope: 'lexical' }],
+		syntax: [{ from: 1, to: 2, kind: 'variable' }],
+		references: [{ from: 1, to: 2, role: 'reference', scope: 'local' }],
+		sections: [],
+	});
+
+	for (const position of [1, 2]) {
+		let state = EditorState.create({ doc: 'abc', extensions: [commonAnalysisState] });
+		state = state.update({ effects: setCommonAnalysis.of(make(1)) }).state;
+		state = state.update({ changes: { from: position, insert: 'x' } }).state;
+		const stale = state.field(commonAnalysisState);
+		assert.equal(stale.stale, true);
+		assert.deepEqual(stale.declarations, []);
+		assert.deepEqual(stale.syntax, []);
+		assert.deepEqual(stale.references, []);
+	}
+
+	let sameLength = EditorState.create({ doc: 'abc', extensions: [commonAnalysisState] });
+	sameLength = sameLength.update({ effects: setCommonAnalysis.of(make(1)) }).state;
+	sameLength = sameLength.update({ changes: { from: 0, to: 1, insert: 'z' } }).state;
+	sameLength = sameLength.update({ effects: setCommonAnalysis.of(make(1)) }).state;
+	assert.equal(sameLength.field(commonAnalysisState).stale, true);
+	sameLength = sameLength.update({ effects: setCommonAnalysis.of(make(2)) }).state;
+	assert.equal(sameLength.field(commonAnalysisState).version, 2);
+	assert.equal(sameLength.field(commonAnalysisState).stale, false);
+});
+
 test('shared analysis drops a section whose start is deleted', () => {
 	let state = EditorState.create({ doc: 'function fn() {}', extensions: [commonAnalysisState] });
 	state = state.update({ effects: setCommonAnalysis.of(createCommonAnalysis({

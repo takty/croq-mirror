@@ -1,4 +1,4 @@
-// src/analysis/common-analysis.js
+// .build/analysis/common-analysis.js
 import { StateEffect, StateField } from "@codemirror/state";
 var structureKinds = /* @__PURE__ */ new Set(["function", "class", "conditional", "loop"]);
 var declarationMutabilities = /* @__PURE__ */ new Set(["mutable", "immutable", "unknown"]);
@@ -112,7 +112,7 @@ var commonAnalysisState = StateField.define({
       if (next.sourceLength !== transaction.newDoc.length) {
         throw new RangeError("Common analysis does not match the document length");
       }
-      if (value && next.version < value.version) continue;
+      if (value && (next.version < value.version || value.stale && next.version <= value.version)) continue;
       value = next;
     }
     return value;
@@ -123,7 +123,7 @@ function mapAnalysis(analysis, transaction) {
     let affected = false;
     transaction.changes.iterChanges((from2, to2, newFrom, newTo) => {
       if (from2 === to2) {
-        if (discardInterior && from2 > range.from && from2 < range.to && (!preserveLayout || !isSafeLayoutInsertion(transaction, from2, newFrom, newTo))) affected = true;
+        if (discardInterior && (preserveLayout ? from2 > range.from && from2 < range.to : from2 >= range.from && from2 <= range.to) && (!preserveLayout || !isSafeLayoutInsertion(transaction, from2, newFrom, newTo))) affected = true;
       } else if (from2 < range.to && to2 > range.from) {
         affected = true;
       }

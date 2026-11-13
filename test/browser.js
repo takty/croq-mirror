@@ -633,9 +633,16 @@ try {
 			assert([...root.querySelectorAll('.cm-matchingBracket')].map(node => node.textContent).join('') === '[]',
 				'square brackets match while automatic analysis is disabled');
 			editor.loadDocument('class Broken {');
+			editor.focus();
 			editor.moveTo({ line: 0, ch: 13 });
-			assert(root.querySelector('.cm-nonmatchingBracket') && !root.querySelector('.cm-matchingBracket'),
-				'unmatched brackets do not receive matching circles');
+			const unmatched = root.querySelector('.cm-nonmatchingBracket');
+			assert(unmatched && !root.querySelector('.cm-matchingBracket') &&
+				getComputedStyle(unmatched).backgroundColor !== 'rgba(0, 0, 0, 0)',
+				'unmatched brackets use the standard visible nonmatching style, not matching circles');
+			editor.loadDocument('[)');
+			editor.moveTo({ line: 0, ch: 0 });
+			assert(root.querySelector('.cm-nonmatchingBracket'),
+				'mismatched bracket pairs are marked as nonmatching');
 			editor.setSettings({ analysis: true });
 			editor.loadDocument(source.replace('// }', '// { }'));
 			await editor.analyzeNow();
