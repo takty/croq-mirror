@@ -1,5 +1,6 @@
 import { StateEffect, StateField } from '@codemirror/state';
-import { EditorView, GutterMarker, ViewPlugin, gutter } from '@codemirror/view';
+import { EditorView, GutterMarker, gutter } from '@codemirror/view';
+import { commonAnalysisState } from '../../analysis/common-analysis.js';
 import { extensionStyles } from '../styles.js';
 import css from './style.css';
 
@@ -28,7 +29,7 @@ export const sectionNumberState = StateField.define({
 
 export function getSectionLineNumber(state, line) {
 	if (!Number.isInteger(line) || line < 0 || line >= state.doc.lines) throw new RangeError('Invalid line');
-	const starts = state.field(sectionNumberState);
+	const starts = sectionStarts(state);
 	let low = 0, high = starts.length;
 	while (low < high) {
 		const middle = (low + high) >>> 1;
@@ -36,6 +37,13 @@ export function getSectionLineNumber(state, line) {
 		else high = middle;
 	}
 	return [low, line - (starts[low - 1] ?? 0) + 1];
+}
+
+function sectionStarts(state) {
+	const analysis = state.field(commonAnalysisState, false);
+	return analysis
+		? analysis.sections.map(section => state.doc.lineAt(section.from).number - 1)
+		: state.field(sectionNumberState, false) ?? [];
 }
 
 class LineNumber extends GutterMarker {
@@ -71,7 +79,8 @@ function numberGutter(sectionMode) {
 			return sectionMode ? new LineNumber(...getSectionLineNumber(view.state, line - 1)) : new LineNumber(0, line);
 		},
 		lineMarkerChange: update => sectionMode &&
-			update.startState.field(sectionNumberState) !== update.state.field(sectionNumberState),
+			(update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false) ||
+				update.startState.field(sectionNumberState) !== update.state.field(sectionNumberState)),
 		initialSpacer: view => new LineNumber(0, widestLineNumber(view.state.doc)),
 		updateSpacer(spacer, { state }) {
 			const number = widestLineNumber(state.doc);
@@ -80,65 +89,11 @@ function numberGutter(sectionMode) {
 	});
 }
 
-const scrollMarkers = ViewPlugin.fromClass(class {
-	constructor(view) {
-		this.view = view;
-		this.dom = view.dom.ownerDocument.createElement('div');
-		this.dom.className = 'cm-section-scroll-markers';
-		this.dom.setAttribute('aria-hidden', 'true');
-		view.dom.append(this.dom);
-		this.measure = {
-			key: this,
-			read: view => {
-				const root = view.dom.getBoundingClientRect();
-				const frame = view.scrollDOM.getBoundingClientRect();
-				const height = view.scrollDOM.clientHeight;
-				const markers = view.scrollDOM.scrollHeight > height ? view.state.field(sectionNumberState).map(line => {
-					const block = view.lineBlockAt(view.state.doc.line(line + 1).from);
-					return (block.top + view.defaultLineHeight / 2) / Math.max(view.contentHeight, 1) * 100;
-				}) : [];
-				return { top: frame.top - root.top, height, markers };
-			},
-			write: data => {
-				this.dom.style.top = data.top + 'px';
-				this.dom.style.height = data.height + 'px';
-				this.dom.replaceChildren(...data.markers.map(position => {
-					const marker = this.dom.ownerDocument.createElement('span');
-					marker.style.top = position + '%';
-					return marker;
-				}));
-			},
-		};
-		this.onScroll = () => this.refresh();
-		view.scrollDOM.addEventListener('scroll', this.onScroll, { passive: true });
-		this.refresh();
-	}
-
-	update(update) {
-		if (update.docChanged || update.geometryChanged || update.viewportChanged ||
-			update.startState.field(sectionNumberState) !== update.state.field(sectionNumberState)) this.refresh();
-	}
-
-	refresh() {
-		this.view.requestMeasure(this.measure);
-	}
-
-	destroy() {
-		this.view.scrollDOM.removeEventListener('scroll', this.onScroll);
-		this.dom.remove();
-	}
-});
-
 export const absoluteLineNumbers = numberGutter(false);
 
 export const functionLineNumbers = [
 	sectionNumberState,
 	numberGutter(true),
-	scrollMarkers,
 	EditorView.editorAttributes.of({ class: 'cm-section-mode cm-function-line-numbers' }),
 	extensionStyles(css),
 ];
-
-export function refreshFunctionLineNumbers(view) {
-	view.plugin(scrollMarkers)?.refresh();
-}

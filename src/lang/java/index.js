@@ -1,13 +1,15 @@
 import { java } from '@codemirror/lang-java';
-import { bracketMatching, syntaxTree } from '@codemirror/language';
+import { syntaxTree } from '@codemirror/language';
 import { AnalysisClient } from '../../analysis-client.js';
-import { syntaxHighlightingExtension, syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
+import { syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
 import { adaptJavaAnalysis } from './analysis-adapter.js';
 import { analyzeEditorSyntax } from './editor-syntax-analysis.js';
 
 export const javaLanguage = {
+	supportsFunctionSections: true,
+	supportsBracketMatching: true,
 	extensions: [
-		java(), bracketMatching(), syntaxHighlightingExtension,
+		java(),
 		syntaxHighlightingSource(analyzeEditorSyntax,
 			update => syntaxTree(update.startState) !== syntaxTree(update.state),
 			{ retainOnEdit: true, reconcileComments: state => syntaxTree(state).length }),
@@ -34,13 +36,4 @@ export const javaLanguage = {
 		};
 	},
 
-	presentation(analysis = {}) {
-		return {
-			canIndent: false,
-			lineNumbers: 'sections',
-			sectionStarts: analysis.sectionStarts || [],
-			decorations: analysis.decorations || [],
-			syntaxHighlights: analysis.syntaxHighlights || [],
-		};
-	},
 };

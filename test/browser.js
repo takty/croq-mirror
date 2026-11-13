@@ -39,6 +39,26 @@ try {
 	assert(!('getCodeMirror' in a), 'public API does not expose editor instance');
 	const editorA = document.querySelector('#a .cm-editor');
 	const editorB = document.querySelector('#b .cm-editor');
+	let displayAnalysisEvents = 0;
+	const offDisplayAnalysis = a.on('analysis', () => displayAnalysisEvents++);
+	a.setSettings({ structureHighlight: false, declarationHighlight: false });
+	assert(!editorA.querySelector('.cm-structure-overlay'), 'disabling both canvas features removes the structure view');
+	a.setSettings({ structureHighlight: true, declarationHighlight: false });
+	assert(editorA.querySelector('.cm-structure-overlay'), 'structure highlighting can be enabled without declaration highlighting');
+	a.setSettings({ structureHighlight: false, declarationHighlight: true });
+	assert(editorA.querySelector('.cm-structure-overlay'), 'declaration highlighting can be enabled without structure highlighting');
+	a.setSettings({ structureHighlight: true, declarationHighlight: true });
+	a.setSettings({ syntaxHighlight: false, semanticHighlight: true });
+	assert(editorA.classList.contains('cm-syntax-highlighting'), 'semantic highlighting can remain enabled without syntax coloring');
+	a.setSettings({ syntaxHighlight: false, semanticHighlight: false });
+	assert(!editorA.classList.contains('cm-syntax-highlighting'), 'disabling both syntax features removes their extension');
+	a.setSettings({ syntaxHighlight: true, semanticHighlight: true, bracketMatching: false });
+	assert(!editorA.classList.contains('cm-bracket-matching'), 'bracket matching can be disabled independently');
+	a.setSettings({ bracketMatching: true });
+	assert(editorA.classList.contains('cm-bracket-matching'), 'bracket matching can be re-enabled');
+	await wait(650);
+	assert(displayAnalysisEvents === 0, 'display setting changes do not schedule another parse');
+	offDisplayAnalysis();
 	for (const [text, count] of [['', 1], ['first\nsecond\n', 3]]) {
 		a.loadDocument(text);
 		assert(a.getLineCount() === count, 'line count includes empty and trailing lines: ' + count);
@@ -248,10 +268,17 @@ try {
 	}
 	a.loadDocument('function longFunction() {\n' + '\n'.repeat(999) + '}');
 	await a.analyzeNow();
+	a.setSettings({ functionLineNumbers: true, functionScrollMarkers: false });
 	const longWidth = gutterWidth();
+	a.setSettings({ functionLineNumbers: false, functionScrollMarkers: true });
+	await waitFor(() => editorA.querySelectorAll('.cm-function-scroll-markers > span').length > 0,
+		'function scroll markers did not render independently');
 	a.setSettings({ functionLineNumbers: true });
+	assert(editorA.querySelectorAll('.cm-function-scroll-markers > span').length > 0,
+		'enabling function line numbers does not control function scroll markers');
 	assert(longWidth > normalWidth && gutterWidth() === longWidth, 'both gutters reserve the same width for four-digit numbers');
-	a.setSettings({ functionLineNumbers: false });
+	a.setSettings({ functionLineNumbers: false, functionScrollMarkers: false });
+	assert(!editorA.querySelector('.cm-function-scroll-markers'), 'disabling function scroll markers removes their DOM');
 	a.loadDocument('const broken = ;');
 	await waitFor(() => editorA.querySelector('.cm-lint-marker-error'), 'syntax diagnostics did not render');
 	const lintMarker = editorA.querySelector('.cm-lint-marker-error');

@@ -98,14 +98,20 @@ Use `setDefinitions` to change additional definitions after initialization.
 | `fontSize` | `16` | 10-64 px |
 | `lineHeight` | `165` | Positive percentage |
 | `lineWrapping` | `false` | Line wrapping |
+| `structureHighlight` | `true` | Canvas highlighting for functions, classes, branches, and loops |
+| `declarationHighlight` | `true` | Canvas highlighting for variable declarations |
+| `syntaxHighlight` | `true` | Syntax coloring for comments, keywords, literals, and related tokens |
+| `semanticHighlight` | `true` | Semantic highlighting for definitions and variable references |
 | `functionLineNumbers` | `false` | Per-function line numbers; ordinary line numbers when analysis is disabled |
+| `functionScrollMarkers` | `false` | Independent function-position markers near the scrollbar |
+| `bracketMatching` | `true` | CodeMirror matching-bracket highlighting and gutter indicators |
 | `rulers` | `true` | Indentation guides |
 | `autoIndent` | `true` | Indentation correction during formatting |
 | `autoFormat` | `true` | Automatic formatting when editing and leaving a line |
 | `formatting` | `true` | Enables formatting; false also disables explicit formatting |
 | `completion` | `true` | Completion and argument hints |
 | `diagnostics` | `true` | Static diagnostics |
-| `analysis` | `true` | Automatic structural analysis and display |
+| `analysis` | `true` | Automatic parsing and shared analysis data; disabling it hides analysis-based displays |
 | `analysisDelay` | `600` | Automatic analysis delay in milliseconds, zero or greater |
 | `readOnly` | `false` | Prevents editing while allowing selection, copying, and search |
 | `disabled` | `false` | Stops user interaction; preserves the read-only setting when re-enabled |
@@ -114,6 +120,11 @@ Unknown setting names, invalid types, and out-of-range values throw errors. Sett
 `codeLanguage` is independent of the UI locale. Omitting it retains JavaScript;
 explicit `null` selects plain text without language-specific extensions.
 Changing `codeLanguage` through `setSettings` throws; recreate the editor to change it.
+Display settings can be changed independently at runtime and do not trigger a new
+parse. The `analysis` setting controls worker parsing and shared data, while each
+display setting controls only its corresponding presentation; synchronous
+CodeMirror syntax sources may continue to provide interim coloring. Function
+markers are independent of function line numbers.
 
 ```js
 const editor = await createEditor(container, { codeLanguage: null });
@@ -133,7 +144,7 @@ Java diagnostics, completion, and formatting are not implemented yet.
 
 Plain text retains editing, undo/redo, search, and ordinary line numbers. It does
 not create an analysis worker or completion engine. Diagnostics, formatting,
-completion, structural decorations and per-function numbering have no effect,
+completion, structural decorations, function numbering and scroll markers have no effect,
 even if their settings are true. Settings retain the requested values.
 `getAnalysis()` and `await analyzeNow()` return `null`; no analysis events are
 emitted. `setDefinitions()` accepts but does not use definitions in plain text.
@@ -220,9 +231,11 @@ The caller supplies current data in drawing order and is responsible for rejecti
 stale asynchronous analysis results. Treat the supplied array and its contents
 as immutable after dispatch. Document changes or a `load` user event
 clear the display by default; dispatch `setStructure.of([])` to clear it explicitly.
-The editor opts into `retainStructureOnEdit` (also exported by the extension):
-it discards items spanning edited lines and maps other items to their new
-positions until fresh analysis arrives. Ordinary newline insertions and automatic
+Standalone users can opt into `retainStructureOnEdit` (also exported by the
+extension): it discards items spanning edited lines and maps other items to their
+new positions. The component instead consumes its versioned common analysis,
+which maps unaffected ranges as stale interim data until fresh analysis arrives.
+Ordinary newline insertions and automatic
 indentation preserve enclosing and shifted structures; splitting an identifier,
 a line comment, or a restricted statement is treated more conservatively.
 Edits to delimiters or comments also discard later items because their
@@ -248,9 +261,24 @@ console.log(getSectionLineNumber(view.state, 13)); // [2, 2]
 Section starts are ordered zero-based document lines; the example requires at
 least 14 lines. The result is `[sectionNumber, lineWithinSection]`, with section
 number zero before the first start. Document edits or a `load` user event clear
-the starts; dispatch an empty array to clear them explicitly. The caller must
-reject stale asynchronous analysis results. Removing the extension removes its
-gutter and scroll markers.
+the manually supplied starts; dispatch an empty array to clear them explicitly.
+Removing the extension removes its gutter.
+
+### Function scroll-marker extension
+
+`croq-mirror/function-scroll-markers` renders function start positions beside
+the scrollbar without adding a gutter or depending on the function-number
+extension. In the component, `functionScrollMarkers` controls it independently
+of `functionLineNumbers`. It reads shared analysis sections. Standalone users
+can include the shared state and publish data with:
+
+```js
+import { commonAnalysisState, setCommonAnalysis } from 'croq-mirror/analysis';
+import { functionScrollMarkers } from 'croq-mirror/function-scroll-markers';
+
+// Include both in the editor extensions; publish validated common analysis
+// with setCommonAnalysis.of(data) when the document's current analysis arrives.
+```
 
 ### Gutter line-selection extension
 
@@ -318,6 +346,16 @@ active line. Font weights and literal shadows can be customized with
 `--croq-syntax-definition-font-weight`, `--croq-syntax-literal-font-weight`, and
 `--croq-syntax-literal-text-shadow`.
 
+The component's `syntaxHighlight` and `semanticHighlight` settings independently
+toggle token coloring and definition/reference decoration.
+
+### Bracket matching extension
+
+`croq-mirror/bracket-matching` combines CodeMirror's `bracketMatching()` with
+the component's gutter indicators for matching brackets. The `bracketMatching`
+setting toggles both together; it does not scan the whole document for unmatched
+brackets.
+
 ### Indentation ruler extension
 
 `croq-mirror/indent-rulers` provides standalone guides at character columns 4,
@@ -373,7 +411,7 @@ by the extensions are applied directly and are not CSS custom properties.
 
 ## Sources and build
 
-`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/extensions/` contains the structure display, function line-number, gutter line-selection, syntax-highlighting, and indentation ruler extensions. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` and `src/lang/java/` contain language-specific functionality, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
+`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/analysis/` defines and manages shared parser data. `src/extensions/` contains the structure view, syntax highlighting, function line numbers, function scroll markers, bracket matching, gutter line selection, and indentation rulers. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` and `src/lang/java/` contain language-specific parsers and adapters, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
 `src/styles/index.css` imports `variables.css`; both scope their rules to the component. The build bundles these files into the distributed stylesheet. CodeMirror 6 installs its base styles when an editor is mounted.
@@ -386,7 +424,7 @@ The distribution contains:
 - `analysis-worker.min.js`: the analysis worker and its parser dependencies
 - `analysis-worker-java.min.js`, `web-tree-sitter.wasm`, `tree-sitter-java.wasm`: the Java parser worker and WebAssembly runtimes
 - `croq-mirror.min.css`: the combined, scoped editor styles
-- `structure-view.js`, `function-line-numbers.js`, `gutter-line-selection.js`, `syntax-highlighting.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
+- `analysis.js`, `structure-view.js`, `syntax-highlighting.js`, `function-line-numbers.js`, `function-scroll-markers.js`, `bracket-matching.js`, `gutter-line-selection.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
 - JavaScript source maps for debugging; these are not required at runtime
 - `licenses/`: third-party licenses
 

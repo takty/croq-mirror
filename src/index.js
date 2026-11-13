@@ -18,7 +18,13 @@ const DEFAULT_SETTINGS = {
 	fontSize            : 16,
 	lineHeight          : 165,
 	lineWrapping        : false,
+	structureHighlight  : true,
+	declarationHighlight: true,
+	syntaxHighlight     : true,
+	semanticHighlight   : true,
 	functionLineNumbers : false,
+	functionScrollMarkers: false,
+	bracketMatching     : true,
 	rulers              : true,
 	autoIndent          : true,
 	autoFormat          : true,
@@ -151,7 +157,6 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				const snapshot = publicAnalysis(result);
 				analysis = structuredClone(snapshot);
 				view.setCommonAnalysis(commonAnalysis);
-				view.setPresentation(language.presentation(result));
 				emit('analysis', snapshot);
 			}
 			return structuredClone(publicAnalysis(result));
@@ -282,15 +287,16 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				if ('codeLanguage' in patch && patch.codeLanguage !== settings.codeLanguage) {
 					throw new TypeError('codeLanguage can only be selected when creating an editor');
 				}
+				const wasAnalyzing = settings.analysis;
+				const delayChanged = Object.hasOwn(patch, 'analysisDelay') && patch.analysisDelay !== settings.analysisDelay;
 				settings = { ...settings, ...patch };
 				if (!settings.analysis) {
 					clearTimeout(timer);
 					analysis = null;
 					view.setCommonAnalysis(null);
-					view.setPresentation();
 				}
 				applySettings();
-				if (settings.analysis) schedule();
+				if (settings.analysis && (!wasAnalyzing || delayChanged)) schedule();
 				emit('settings', settings);
 				emit('state', state());
 			},

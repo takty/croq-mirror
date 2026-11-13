@@ -1,8 +1,9 @@
-// .build/extensions/structure-view/index.js
+// src/extensions/structure-view/index.js
 import { Facet, StateEffect, StateField, countColumn } from "@codemirror/state";
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
+import { commonAnalysisState } from "croq-mirror/analysis";
 
-// .build/extensions/styles.js
+// src/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
 function extensionStyles(css) {
   return ViewPlugin.fromClass(class {
@@ -23,13 +24,20 @@ function extensionStyles(css) {
   });
 }
 
-// .build/extensions/structure-view/style.css
+// src/extensions/structure-view/style.css
 var style_default = ".cm-editor.cm-structure-view .cm-scroller {\r\n	z-index: var(--croq-structure-scroller-z-index, auto);\r\n}\r\n\r\n.cm-editor.cm-structure-view .cm-content {\r\n	z-index: var(--croq-structure-content-z-index, 1);\r\n}\r\n\r\n.cm-editor.cm-structure-view .cm-structure-overlay {\r\n	position: var(--croq-structure-overlay-position, absolute);\r\n	z-index: var(--croq-structure-overlay-z-index, 0);\r\n	overflow: var(--croq-structure-overlay-overflow, hidden);\r\n	pointer-events: var(--croq-structure-overlay-pointer-events, none);\r\n}\r\n\r\n.cm-editor.cm-structure-view .code-structure-view {\r\n	display: var(--croq-structure-canvas-display, block);\r\n	width: var(--croq-structure-canvas-width, 100%);\r\n	height: var(--croq-structure-canvas-height, 100%);\r\n}\r\n";
 
-// .build/extensions/structure-view/index.js
+// src/extensions/structure-view/index.js
 var setStructure = StateEffect.define();
 var retainOnEditFacet = Facet.define({ combine: (values) => values.some(Boolean) });
+var displayOptions = Facet.define({ combine: (values) => values.at(-1) ?? { structures: true, declarations: true } });
 var retainStructureOnEdit = retainOnEditFacet.of(true);
+function structureViewOptions(options) {
+  if (!options || typeof options.structures !== "boolean" || typeof options.declarations !== "boolean") {
+    throw new TypeError("Structure view options must specify structures and declarations");
+  }
+  return displayOptions.of(options);
+}
 function mapUnchangedStructure(items, transaction) {
   const oldDoc = transaction.startState.doc, newDoc = transaction.newDoc;
   const affected = [];
@@ -106,7 +114,7 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     this.refresh();
   }
   update(update) {
-    if (update.docChanged || update.geometryChanged || update.viewportChanged || update.startState.field(structureField) !== update.state.field(structureField)) this.refresh();
+    if (update.docChanged || update.geometryChanged || update.viewportChanged || update.startState.field(structureField) !== update.state.field(structureField) || update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false) || update.startState.facet(displayOptions) !== update.state.facet(displayOptions)) this.refresh();
   }
   refresh() {
     this.view.requestMeasure(this.measure);
@@ -141,7 +149,10 @@ var structurePlugin = ViewPlugin2.fromClass(class {
       const columns = countColumn(doc.sliceString(block.from, offset), tabSize);
       return { x: content.left - left + linePadding + columns * view.defaultCharacterWidth, y: lineTop };
     };
-    const decorations = view.state.field(structureField).map((item) => {
+    const analysis = view.state.field(commonAnalysisState, false);
+    const options = view.state.facet(displayOptions);
+    const source = analysis ? commonDecorations(analysis, doc, options) : view.state.field(structureField);
+    const decorations = source.map((item) => {
       const start = coords(item.from);
       const end = coords(item.to, -1);
       const fill2 = resolveColor(item.fill);
@@ -181,6 +192,47 @@ var structureView = [
   EditorView2.editorAttributes.of({ class: "cm-structure-view" }),
   extensionStyles(style_default)
 ];
+function commonDecorations(analysis, doc, options) {
+  const colors = {
+    class: ["var(--croq-mirror-l-red, #e61e58)", 0.15],
+    function: ["hsla(40, 100%, 50%, 0.15)"],
+    conditional: ["hsla(150, 100%, 35%, 0.15)"],
+    loop: ["hsla(190, 90%, 50%, 0.20)"]
+  };
+  const position = (offset) => {
+    const line = doc.lineAt(offset);
+    return { line: line.number - 1, ch: offset - line.from };
+  };
+  const decorations = [];
+  if (options.structures) {
+    for (const item of analysis.structures) {
+      const [fill2, opacity] = colors[item.kind];
+      decorations.push({
+        kind: "range",
+        from: position(item.from),
+        to: position(item.to),
+        fill: fill2,
+        ...opacity === void 0 ? {} : { opacity },
+        spineChars: 3,
+        branchChars: 4,
+        branches: item.branches.map(position)
+      });
+    }
+  }
+  if (options.declarations) {
+    for (const item of analysis.declarations) {
+      const colors2 = item.scope === "function" ? ["hsla(0, 0%, 97%, 1)", "hsla(0, 0%, 69%, 0.75)"] : item.mutability === "immutable" ? ["hsla(240, 75%, 97%, 1)", "hsla(240, 75%, 65%, 0.75)"] : ["hsla(205, 100%, 97%, 1)", "hsla(205, 100%, 52%, 0.75)"];
+      decorations.push({
+        kind: "token",
+        from: position(item.from),
+        to: position(item.to),
+        fill: colors2[0],
+        stroke: colors2[1]
+      });
+    }
+  }
+  return decorations;
+}
 function refreshStructure(view) {
   view.plugin(structurePlugin)?.refresh();
 }
@@ -242,5 +294,6 @@ export {
   refreshStructure,
   retainStructureOnEdit,
   setStructure,
-  structureView
+  structureView,
+  structureViewOptions
 };

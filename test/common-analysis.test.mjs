@@ -37,9 +37,11 @@ test('JavaScript conditional branches use common UTF-16 offsets', () => {
 	assert.ok(conditional.branches[0] > conditional.from && conditional.branches[0] < conditional.to);
 });
 
-test('shared analysis state validates document ranges, rejects older versions and clears on edits', () => {
+test('shared analysis state validates ranges, rejects older versions and maps usable data as stale', () => {
 	const make = (version, sourceLength = 3) => createCommonAnalysis({
-		version, sourceLength, complete: true, structures: [], declarations: [], syntax: [], references: [], sections: [],
+		version, sourceLength, complete: true, structures: [], declarations: [],
+		syntax: sourceLength >= 3 ? [{ from: 1, to: 3, kind: 'keyword' }] : [],
+		references: [], sections: sourceLength >= 3 ? [{ kind: 'function', from: 1 }] : [],
 	});
 	let state = EditorState.create({ doc: 'abc', extensions: [commonAnalysisState] });
 	state = state.update({ effects: setCommonAnalysis.of(make(3)) }).state;
@@ -54,8 +56,40 @@ test('shared analysis state validates document ranges, rejects older versions an
 	}), /range/);
 
 	state = state.update({ changes: { from: 0, to: 1, insert: 'x' } }).state;
-	assert.equal(state.field(commonAnalysisState), null);
+	assert.equal(state.field(commonAnalysisState).stale, true);
+	assert.equal(state.field(commonAnalysisState).sourceLength, 3);
+	assert.deepEqual(state.field(commonAnalysisState).syntax, [{ from: 1, to: 3, kind: 'keyword' }]);
 	state = state.update({ effects: setCommonAnalysis.of(make(4)) }).state;
+	assert.equal(state.field(commonAnalysisState).version, 4);
+	state = state.update({ changes: { from: 2, insert: '!' } }).state;
+	assert.equal(state.field(commonAnalysisState).stale, true);
+	assert.deepEqual(state.field(commonAnalysisState).syntax, []);
+	assert.deepEqual(state.field(commonAnalysisState).sections, [{ kind: 'function', from: 1 }]);
+	state = state.update({ effects: setCommonAnalysis.of(make(5, 4)) }).state;
 	state = state.update({ userEvent: 'load' }).state;
 	assert.equal(state.field(commonAnalysisState), null);
+});
+
+test('shared analysis drops a section whose start is deleted', () => {
+	let state = EditorState.create({ doc: 'function fn() {}', extensions: [commonAnalysisState] });
+	state = state.update({ effects: setCommonAnalysis.of(createCommonAnalysis({
+		version: 1, sourceLength: state.doc.length, complete: true,
+		structures: [], declarations: [], syntax: [], references: [],
+		sections: [{ kind: 'function', from: 0 }],
+	})) }).state;
+	state = state.update({ changes: { from: 0, to: 8 } }).state;
+	assert.deepEqual(state.field(commonAnalysisState).sections, []);
+});
+
+test('shared analysis maps enclosing structures across safe newline insertions', () => {
+	let state = EditorState.create({ doc: 'fn()', extensions: [commonAnalysisState] });
+	state = state.update({ effects: setCommonAnalysis.of(createCommonAnalysis({
+		version: 1, sourceLength: state.doc.length, complete: true,
+		structures: [{ kind: 'function', from: 0, to: state.doc.length, branches: [] }],
+		declarations: [], syntax: [], references: [], sections: [],
+	})) }).state;
+	state = state.update({ changes: { from: 2, insert: '\n  ' } }).state;
+	const analysis = state.field(commonAnalysisState);
+	assert.equal(analysis.stale, true);
+	assert.deepEqual(analysis.structures.map(({ from, to }) => ({ from, to })), [{ from: 0, to: state.doc.length }]);
 });

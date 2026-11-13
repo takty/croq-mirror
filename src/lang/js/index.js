@@ -1,24 +1,24 @@
 import { closeBrackets } from '@codemirror/autocomplete';
 import { javascript, javascriptLanguage as javascriptSyntax } from '@codemirror/lang-javascript';
-import { bracketMatching, syntaxTree } from '@codemirror/language';
+import { syntaxTree } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
 import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
-import { syntaxHighlightingExtension, syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
+import { syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
 import { adaptJavaScriptAnalysis } from './analysis-adapter.js';
 import { analyzeSyntax } from './syntax-analysis.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
 // crosses this boundary; the view applies returned data to its own document/UI.
 export const javascriptLanguage = {
+	supportsFunctionSections: true,
+	supportsBracketMatching: true,
 	extensions: [
 		javascript(),
 		javascriptSyntax.data.of({ closeBrackets: { brackets: ['(', '[', "'", '"', '`'] } }),
 		closeBrackets(),
-		bracketMatching(),
 		EditorView.editorAttributes.of({ class: 'cm-javascript' }),
-		syntaxHighlightingExtension,
 		syntaxHighlightingSource(analyzeSyntax, update => syntaxTree(update.startState) !== syntaxTree(update.state)),
 	],
 
@@ -74,32 +74,6 @@ export const javascriptLanguage = {
 		}
 	},
 
-	presentation(analysis = {}) {
-		const position = p => ({ line: p.line - 1, ch: p.column });
-		const decorations = [];
-		for (const [key, fill, opacity] of [
-			['classLocs', 'var(--croq-mirror-l-red, #e61e58)', 0.15],
-			['fnLocs', 'hsla(40, 100%, 50%, 0.15)'],
-			['ifLocs', 'hsla(150, 100%, 35%, 0.15)'],
-			['forLocs', 'hsla(190, 90%, 50%, 0.20)'],
-		]) {
-			for (const [from, to, ...branches] of analysis[key] || []) {
-				decorations.push({ kind: 'range', from: position(from), to: position(to), fill,
-					...(opacity === undefined ? {} : { opacity }),
-					spineChars: 3, branchChars: 4, branches: branches.map(position) });
-			}
-		}
-		for (const [key, fill, stroke] of [
-			['varLocs', 'hsla(0, 0%, 97%, 1)', 'hsla(0, 0%, 69%, 0.75)'],
-			['letLocs', 'hsla(205, 100%, 97%, 1)', 'hsla(205, 100%, 52%, 0.75)'],
-			['constLocs', 'hsla(240, 75%, 97%, 1)', 'hsla(240, 75%, 65%, 0.75)'],
-		]) {
-			for (const [from, to] of analysis[key] || []) {
-				decorations.push({ kind: 'token', from: position(from), to: position(to), fill, stroke });
-			}
-		}
-		return { canIndent: !!analysis.success, sectionStarts: [...(analysis.fnStarts || [])], decorations };
-	},
 };
 
 class JavaScriptCompletion {

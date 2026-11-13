@@ -2,13 +2,16 @@ import { Editor } from '../.build/editor-view.js';
 import { javascriptLanguage } from '../.build/lang/js/index.js';
 import { plainLanguage } from '../.build/lang/plain/index.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
+import { createCommonAnalysis } from '../.build/analysis/common-analysis.js';
+import { commonAnalysisState, setCommonAnalysis } from '../dist/analysis.js';
 import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { retainStructureOnEdit, setStructure, structureView } from '../dist/structure-view.js';
 import { functionLineNumbers, getSectionLineNumber, setSectionStarts } from '../dist/function-line-numbers.js';
+import { functionScrollMarkers } from '../dist/function-scroll-markers.js';
 import { gutterLineSelection, setLineSelectionMode } from '../dist/gutter-line-selection.js';
 import { indentRulers } from '../dist/indent-rulers.js';
-import { setSyntaxHighlights, syntaxHighlightingExtension, syntaxHighlightingSource } from '../dist/syntax-highlighting.js';
+import { setSyntaxHighlights, syntaxHighlightingExtension, syntaxHighlightingOptions, syntaxHighlightingSource } from '../dist/syntax-highlighting.js';
 
 export async function runLanguageContractTests(assert) {
 	const ja = javascriptLanguage.diagnostics('var x = 1', 'ja', { esversion: 10, varstmt: true });
@@ -27,20 +30,27 @@ export async function runLanguageContractTests(assert) {
 	plainSession.complete({}, result => { completed = result === null; });
 	plainSession.destroy();
 	assert(completed, 'plain completion invokes callback with no candidates');
-	const raw = analyze('function example() {\n let x = 1;\n if (x) { x++; } else { x--; }\n const y = 2;\n}');
+	const source = 'function example() {\n let x = 1;\n if (x) { x++; } else { x--; }\n const y = 2;\n}';
+	const raw = analyze(source);
 	const snapshot = JSON.stringify(raw);
-	const data = javascriptLanguage.presentation(raw);
-	assert(JSON.stringify(raw) === snapshot, 'presentation conversion preserves public analysis');
-	assert(data.canIndent && data.sectionStarts[0] === 0, 'analysis supplies section boundaries and indent permission');
-	const branch = data.decorations.find(item => item.kind === 'range' && item.branches.length);
-	assert(branch.from.line === 2 && branch.branches[0].line === 2 && branch.from.ch === 1, 'presentation converts branch and range coordinates to zero-based positions');
-	assert(data.decorations.filter(item => item.kind === 'token').length === 2, 'declarations become generic token decorations');
-	assert(!javascriptLanguage.presentation(analyze('function unfinished( {')).canIndent, 'tolerant analysis does not authorize indentation');
-	const classData = javascriptLanguage.presentation(analyze('class Example {\n method() {}\n}'));
-	assert(classData.decorations[0].fill === 'var(--croq-mirror-l-red, #e61e58)' &&
-		classData.decorations[0].opacity === 0.15 && classData.decorations[0].from.line === 0 &&
-		classData.decorations[0].to.line === 2 && classData.decorations[1].fill === 'hsla(40, 100%, 50%, 0.15)',
-		'JavaScript class range precedes method decorations');
+	const parsedState = EditorState.create({ doc: source, extensions: javascriptLanguage.extensions });
+	const data = javascriptLanguage.analysisData(raw, parsedState, 1);
+	assert(JSON.stringify(raw) === snapshot, 'common analysis conversion preserves public analysis');
+	assert(data.complete && data.sections[0].from === 0, 'analysis supplies language-neutral function sections');
+	const branch = data.structures.find(item => item.kind === 'conditional' && item.branches.length);
+	assert(branch.from === source.indexOf('if') && branch.branches[0] > branch.from && branch.branches[0] < branch.to,
+		'conditional structures and branches use common UTF-16 offsets');
+	assert(data.declarations.filter(item => item.kind === 'variable').length === 2,
+		'variable declarations are represented as common semantic data');
+	assert(!javascriptLanguage.analysisData(analyze('function unfinished( {'),
+		EditorState.create({ doc: 'function unfinished( {', extensions: javascriptLanguage.extensions }), 2).complete,
+		'incomplete tolerant analysis does not authorize indentation');
+	const classSource = 'class Example {\n method() {}\n}';
+	const classData = javascriptLanguage.analysisData(analyze(classSource),
+		EditorState.create({ doc: classSource, extensions: javascriptLanguage.extensions }), 3);
+	const classStructure = classData.structures.find(item => item.kind === 'class');
+	assert(classStructure?.from === 0 && classStructure.to === classSource.length && classData.sections.length === 1,
+		'JavaScript class and method data use language-neutral structure and section kinds');
 
 	const host = document.createElement('div');
 	host.style.cssText = 'height:150px;width:500px';
@@ -256,8 +266,6 @@ export async function runLanguageContractTests(assert) {
 		assert(getComputedStyle(gutter).overflow === 'visible' &&
 			getComputedStyle(firstSection, '::before').backgroundColor !== 'rgba(0, 0, 0, 0)',
 			'standalone gutter renders the section background');
-		assert(numbersHost.querySelectorAll('.cm-section-scroll-markers > span').length === 2,
-			'standalone function line numbers render scroll markers');
 		numbersHost.style.setProperty('--croq-function-number-color', '#123456');
 		numbersHost.style.setProperty('--croq-function-line-color', '#234567');
 		numbersHost.style.setProperty('--croq-function-number-padding', '0 9px 0 6px');
@@ -267,25 +275,15 @@ export async function runLanguageContractTests(assert) {
 		numbersHost.style.setProperty('--croq-function-stripe-color', '#bcdef0');
 		numbersHost.style.setProperty('--croq-function-alternate-background', '#345678');
 		numbersHost.style.setProperty('--croq-mirror-lint-gutter-width', '8px');
-		numbersHost.style.setProperty('--croq-function-scroll-marker-track-width', '16px');
-		numbersHost.style.setProperty('--croq-function-scroll-marker-inset', '3px');
-		numbersHost.style.setProperty('--croq-function-scroll-marker-radius', '25%');
-		numbersHost.style.setProperty('--croq-function-scroll-marker-z-index', '6');
-		numbersHost.style.setProperty('--croq-function-scroll-marker-color', '#102030');
 		const edge = getComputedStyle(numbersHost.querySelector('.cm-gutters'), '::after');
-		const track = numbersHost.querySelector('.cm-section-scroll-markers');
-		const marker = track.querySelector('span');
 		assert(getComputedStyle(gutter.querySelector('.cm-function-number')).color === 'rgb(18, 52, 86)' &&
 			getComputedStyle(gutter.querySelector('.cm-function-number')).paddingLeft === '6px' &&
 			getComputedStyle(gutter.querySelector('.cm-croq-line-number')).color === 'rgb(35, 69, 103)' &&
 			getComputedStyle(visible[0]).minWidth === '48px' && edge.width === '21px' &&
 			edge.backgroundImage.includes('5px') && edge.backgroundImage.includes('188, 222, 240') &&
 			getComputedStyle(firstSection, '::before').backgroundColor === 'rgb(52, 86, 120)' &&
-			getComputedStyle(firstSection, '::before').left === '-8px' &&
-			getComputedStyle(track).width === '16px' && getComputedStyle(track).zIndex === '6' &&
-			getComputedStyle(marker).left === '3px' && getComputedStyle(marker).borderRadius === '25%' &&
-			getComputedStyle(marker).backgroundColor === 'rgb(16, 32, 48)',
-			'function gutter colors, dimensions, stripes and markers respond to custom properties');
+			getComputedStyle(firstSection, '::before').left === '-8px',
+			'function gutter colors, dimensions and stripes respond to custom properties');
 		numbersHost.style.setProperty('--croq-function-gutter-edge-pattern', 'none');
 		numbersHost.style.setProperty('--croq-function-gutter-edge-color', '#456789');
 		assert(getComputedStyle(numbersHost.querySelector('.cm-gutters'), '::after').backgroundImage === 'none' &&
@@ -293,10 +291,9 @@ export async function runLanguageContractTests(assert) {
 			'function gutter edge pattern and color can be overridden');
 		numbers.dispatch({ changes: { from: 0, insert: 'x' } });
 		await new Promise(resolve => setTimeout(resolve, 100));
-		assert(getSectionLineNumber(numbers.state, 31).join() === '0,32' &&
-			!numbersHost.querySelector('.cm-section-scroll-markers > span'), 'editing clears stale numbering and scroll markers');
+		assert(getSectionLineNumber(numbers.state, 31).join() === '0,32', 'editing clears stale standalone numbering');
 		numbers.dispatch({ effects: numbersCompartment.reconfigure([]) });
-		assert(!numbersHost.querySelector('.cm-sectionNumbers') && !numbersHost.querySelector('.cm-section-scroll-markers'),
+		assert(!numbersHost.querySelector('.cm-sectionNumbers'),
 			'removing the function line-number extension removes its UI');
 		numbers.dispatch({ effects: numbersCompartment.reconfigure(functionLineNumbers) });
 		numbers.dispatch({ effects: setSectionStarts.of([1]) });
@@ -305,6 +302,54 @@ export async function runLanguageContractTests(assert) {
 	} finally {
 		numbers.destroy();
 		numbersHost.remove();
+	}
+
+	const markersHost = document.createElement('div');
+	markersHost.style.cssText = 'height:150px;width:500px';
+	document.body.prepend(markersHost);
+	const markersCompartment = new Compartment();
+	const markerDoc = Array.from({ length: 60 }, (_, i) => 'line ' + i).join('\n');
+	const markers = new EditorView({
+		state: EditorState.create({
+			doc: markerDoc,
+			extensions: [
+				commonAnalysisState,
+				markersCompartment.of(functionScrollMarkers),
+				EditorView.theme({ '&': { height: '150px', width: '500px' }, '.cm-scroller': { overflow: 'auto' } }),
+			],
+		}),
+		parent: markersHost,
+	});
+	try {
+		markersHost.style.setProperty('--croq-function-scroll-marker-track-width', '16px');
+		markersHost.style.setProperty('--croq-function-scroll-marker-inset', '3px');
+		markersHost.style.setProperty('--croq-function-scroll-marker-radius', '25%');
+		markersHost.style.setProperty('--croq-function-scroll-marker-z-index', '6');
+		markersHost.style.setProperty('--croq-function-scroll-marker-color', '#102030');
+		markers.dispatch({ effects: setCommonAnalysis.of(createCommonAnalysis({
+			version: 1, sourceLength: markerDoc.length, complete: true,
+			structures: [], declarations: [], syntax: [], references: [],
+			sections: [
+				{ kind: 'function', from: markerDoc.indexOf('line 1') },
+				{ kind: 'function', from: markerDoc.indexOf('line 30') },
+			],
+		})) });
+		await new Promise(resolve => setTimeout(resolve, 300));
+		const track = markersHost.querySelector('.cm-editor > .cm-function-scroll-markers');
+		const marker = track?.querySelector('span');
+		assert(markersHost.querySelectorAll('.cm-function-scroll-markers > span').length === 2 &&
+			!markersHost.querySelector('.cm-sectionNumbers'),
+			'standalone scroll markers consume common sections without the line-number extension');
+		assert(getComputedStyle(track).width === '16px' && getComputedStyle(track).zIndex === '6' &&
+			getComputedStyle(marker).left === '3px' && getComputedStyle(marker).borderRadius === '25%' &&
+			getComputedStyle(marker).backgroundColor === 'rgb(16, 32, 48)',
+			'standalone scroll markers respond to their independent custom properties');
+		markers.dispatch({ effects: markersCompartment.reconfigure([]) });
+		assert(!markersHost.querySelector('.cm-function-scroll-markers'),
+			'removing the scroll-marker extension removes its DOM');
+	} finally {
+		markers.destroy();
+		markersHost.remove();
 	}
 
 	const selectionHost = document.createElement('div');
@@ -415,6 +460,25 @@ export async function runLanguageContractTests(assert) {
 		assert(keyword?.textContent === 'class' && type?.textContent === 'Example' &&
 			getComputedStyle(keyword).color === 'rgb(18, 52, 86)',
 			'standalone syntax extension renders supplied token ranges and custom colors');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([
+			syntaxHighlightingExtension, syntaxHighlightingOptions({ syntax: true, semantic: false }),
+		]) });
+		syntaxView.dispatch({ effects: setSyntaxHighlights.of([
+			{ from: 0, to: 5, kind: 'keyword' }, { from: 6, to: 13, kind: 'local-reference' },
+		]) });
+		assert(syntaxHost.querySelector('.cm-syntax-keyword') && !syntaxHost.querySelector('.cm-syntax-local-reference'),
+			'syntax coloring can be enabled without semantic highlighting');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([
+			syntaxHighlightingExtension, syntaxHighlightingOptions({ syntax: false, semantic: true }),
+		]) });
+		assert(!syntaxHost.querySelector('.cm-syntax-keyword') && syntaxHost.querySelector('.cm-syntax-local-reference'),
+			'semantic highlighting can be enabled without syntax coloring');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure([
+			syntaxHighlightingExtension, syntaxHighlightingOptions({ syntax: false, semantic: false }),
+		]) });
+		assert(!syntaxHost.querySelector('.cm-syntax-keyword, .cm-syntax-local-reference'),
+			'disabling both highlighting categories removes their decorations');
+		syntaxView.dispatch({ effects: syntaxCompartment.reconfigure(syntaxHighlightingExtension) });
 		syntaxView.dispatch({ changes: { from: 0, insert: ' ' } });
 		assert(!syntaxHost.querySelector('.cm-syntax-keyword, .cm-syntax-type'),
 			'syntax highlighting clears stale ranges on document edits');
@@ -594,8 +658,8 @@ export async function runLanguageContractTests(assert) {
 	document.body.prepend(root);
 	let disposed = false, definitions;
 	const language = {
+		supportsFunctionSections: true,
 		extensions: [],
-		presentation: () => ({ canIndent: false, sectionStarts: [], decorations: [] }),
 		completionTrigger: () => null,
 		formatLine: text => ({ text: text.trimEnd().toUpperCase(), indent: false }),
 		createCompletionSession: () => ({
@@ -607,7 +671,13 @@ export async function runLanguageContractTests(assert) {
 	};
 	const view = new Editor({ language, phrases: {}, onFontSizeChange() {} }, root);
 	try {
-		const settings = { analysis: true, functionLineNumbers: true, completion: true, fontSize: 16, fontFamily: 'monospace', lineHeight: 165 };
+		const settings = {
+			analysis: true, functionLineNumbers: true, functionScrollMarkers: false, completion: true,
+			structureHighlight: true, declarationHighlight: true, syntaxHighlight: true,
+			semanticHighlight: true, bracketMatching: true, lineWrapping: false, rulers: false,
+			autoIndent: false, fontSize: 16, fontFamily: 'monospace', lineHeight: 165,
+			disabled: false, readOnly: false,
+		};
 		const diagnostics = () => [{ from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, severity: 'error', message: 'Generic diagnostic' }];
 		view.setOptions(settings, {}, diagnostics);
 		view.loadDocument('abc\ndef\nghi');
@@ -632,10 +702,12 @@ export async function runLanguageContractTests(assert) {
 			'collapsing a selection restores the current line and gutter');
 		view.setDefinitions(['opaque definition']);
 		assert(definitions[0] === 'opaque definition', 'view forwards definitions without interpreting them');
-		view.setPresentation({
-			canIndent: false, sectionStarts: [1],
-			decorations: [{ kind: 'token', from: { line: 1, ch: 0 }, to: { line: 1, ch: 3 }, fill: '#ff0000', stroke: '#000000' }],
-		});
+		view.setCommonAnalysis(createCommonAnalysis({
+			version: 1, sourceLength: 11, complete: true,
+			structures: [{ kind: 'function', from: 0, to: 11, branches: [] }],
+			declarations: [{ kind: 'variable', from: 4, to: 7, mutability: 'immutable', scope: 'lexical' }],
+			syntax: [], references: [], sections: [{ kind: 'function', from: 4 }],
+		}));
 		assert(view.getSectionLineNumber(0).join() === '0,1' && view.getSectionLineNumber(2).join() === '1,2', 'view numbers sections from language-neutral data');
 		assert(root.querySelector('.cm-function-number')?.textContent === '1', 'view renders section start markers');
 		view.setOptions({ ...settings, functionLineNumbers: false }, {}, diagnostics);
@@ -646,7 +718,8 @@ export async function runLanguageContractTests(assert) {
 			'switching back restores the current section numbering');
 		await new Promise(resolve => setTimeout(resolve, 450));
 		const canvas = root.querySelector('canvas');
-		assert(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value), 'view draws supplied token decoration');
+		assert(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value),
+			'view draws structure and declaration data from shared analysis');
 		await new Promise(resolve => setTimeout(resolve, 200));
 		assert(root.querySelector('.cm-lint-marker-error'), 'view renders generic diagnostics');
 		view.view.dispatch({ selection: { anchor: 3 } });
@@ -660,8 +733,8 @@ export async function runLanguageContractTests(assert) {
 		view.view.dispatch({ selection: { anchor: 7 } });
 		view.format();
 		assert(view.view.state.doc.line(2).text === 'def', 'read-only blocks language formatting edits');
-		view.setPresentation();
-		assert(view.getSectionLineNumber(2).join() === '0,3', 'clearing presentation restores absolute numbering');
+		view.setCommonAnalysis(null);
+		assert(view.getSectionLineNumber(2).join() === '0,3', 'clearing common analysis restores absolute numbering');
 	} finally {
 		view.destroy();
 		root.remove();

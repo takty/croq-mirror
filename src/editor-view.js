@@ -12,12 +12,13 @@ import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/li
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
 import { commonAnalysisState, setCommonAnalysis } from './analysis/common-analysis.js';
-import { refreshStructure, retainStructureOnEdit, setStructure, structureView } from './extensions/structure-view/index.js';
-import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber, refreshFunctionLineNumbers, sectionNumberState, setSectionStarts } from './extensions/function-line-numbers/index.js';
+import { bracketMatchingExtension } from './extensions/bracket-matching/index.js';
+import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber } from './extensions/function-line-numbers/index.js';
+import { functionScrollMarkers, refreshFunctionScrollMarkers } from './extensions/function-scroll-markers/index.js';
 import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
 import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
-import { setSyntaxHighlights } from './extensions/syntax-highlighting/index.js';
-import { bracketGutterOverlay } from './bracket-gutter-overlay.js';
+import { syntaxHighlightingExtension, syntaxHighlightingOptions } from './extensions/syntax-highlighting/index.js';
+import { refreshStructure, structureView, structureViewOptions } from './extensions/structure-view/index.js';
 
 const TAB_SIZE = 4;
 const legacyKeymap = [
@@ -32,7 +33,6 @@ const legacyKeymap = [
 	{ mac: 'Ctrl-ArrowUp', run: cursorDocStart, shift: selectDocStart },
 	{ mac: 'Ctrl-ArrowDown', run: cursorDocEnd, shift: selectDocEnd },
 ];
-const setPresentation = StateEffect.define();
 const setArgumentHint = StateEffect.define();
 const addHighlight = StateEffect.define();
 const removeHighlight = StateEffect.define();
@@ -55,15 +55,6 @@ const activeLineField = StateField.define({
 		EditorView.decorations.from(field, lines => Decoration.set(lines.map(line => activeLineDecoration.range(line)))),
 		gutterLineClass.from(field, lines => RangeSet.of(lines.map(line => activeLineGutterMarker.range(line)))),
 	],
-});
-
-const presentationField = StateField.define({
-	create: () => null,
-	update(value, transaction) {
-		if (transaction.docChanged || transaction.isUserEvent('load')) value = null;
-		for (const effect of transaction.effects) if (effect.is(setPresentation)) value = effect.value;
-		return value;
-	},
 });
 
 const highlightField = StateField.define({
@@ -117,6 +108,7 @@ export class Editor {
 		this.autoIndent = false;
 		this.completion = true;
 		this.sectionNumbers = false;
+		this.functionMarkers = false;
 		this.changedLine = null;
 		this.abort = new AbortController();
 		this.session = language.createCompletionSession();
@@ -125,6 +117,10 @@ export class Editor {
 			phrases: new Compartment(),
 			wrapping: new Compartment(),
 			numbers: new Compartment(),
+			structure: new Compartment(),
+			syntax: new Compartment(),
+			functionMarkers: new Compartment(),
+			brackets: new Compartment(),
 			access: new Compartment(),
 			diagnostics: new Compartment(),
 			rulers: new Compartment(),
@@ -143,6 +139,16 @@ export class Editor {
 			extensions: [
 				this.options.phrases.of(EditorState.phrases.of(phrases)),
 				this.options.wrapping.of([]),
+				this.options.structure.of([
+					structureView,
+					structureViewOptions({ structures: true, declarations: true }),
+				]),
+				this.options.syntax.of([
+					syntaxHighlightingExtension,
+					syntaxHighlightingOptions({ syntax: true, semantic: true }),
+				]),
+				this.options.functionMarkers.of([]),
+				this.options.brackets.of(bracketMatchingExtension),
 				this.options.access.of([]),
 				this.options.diagnostics.of([]),
 				language.extensions,
@@ -163,16 +169,11 @@ export class Editor {
 					copy: (_event, view) => hasNoSelection(view),
 					cut: (_event, view) => hasNoSelection(view),
 				}),
-				presentationField,
-				structureView,
-				retainStructureOnEdit,
 				this.options.rulers.of(indentRulers),
-				sectionNumberState,
 				gutterLineSelection,
 				highlightField,
 				argumentHintField,
 				commonAnalysisState,
-				bracketGutterOverlay,
 				lintGutter(),
 				this.options.numbers.of(absoluteLineNumbers),
 				search({ top: true }),
@@ -229,8 +230,8 @@ export class Editor {
 		this.readOnly = settings.readOnly;
 		this.autoIndent = settings.autoIndent;
 		this.completion = settings.completion;
-		this.sectionNumbers = settings.analysis && settings.functionLineNumbers
-			&& this.language.presentation().lineNumbers !== 'absolute';
+		this.sectionNumbers = settings.analysis && settings.functionLineNumbers && this.language.supportsFunctionSections;
+		this.functionMarkers = settings.analysis && settings.functionScrollMarkers && this.language.supportsFunctionSections;
 		view.dom.style.fontFamily = settings.fontFamily;
 		view.dom.style.fontSize = settings.fontSize + 'px';
 		view.dom.style.lineHeight = settings.lineHeight + '%';
@@ -240,6 +241,20 @@ export class Editor {
 			this.options.wrapping.reconfigure(settings.lineWrapping ? EditorView.lineWrapping : []),
 			this.options.rulers.reconfigure(settings.rulers ? indentRulers : []),
 			this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers),
+			this.options.structure.reconfigure(settings.structureHighlight || settings.declarationHighlight ? [
+				structureView,
+				structureViewOptions({
+					structures: settings.structureHighlight,
+					declarations: settings.declarationHighlight,
+				}),
+			] : []),
+			this.options.syntax.reconfigure(settings.syntaxHighlight || settings.semanticHighlight ? [
+				syntaxHighlightingExtension,
+				syntaxHighlightingOptions({ syntax: settings.syntaxHighlight, semantic: settings.semanticHighlight }),
+			] : []),
+			this.options.functionMarkers.reconfigure(this.functionMarkers ? functionScrollMarkers : []),
+			this.options.brackets.reconfigure(settings.bracketMatching && this.language.supportsBracketMatching
+				? bracketMatchingExtension : []),
 			this.options.access.reconfigure([
 				EditorState.readOnly.of(this.readOnly || !this.enabled),
 				EditorView.editable.of(this.enabled),
@@ -385,7 +400,8 @@ export class Editor {
 			});
 			if (!result || /[\r\n]/.test(result.text)) continue;
 			let text = result.text;
-			if (result.indent && state.field(presentationField)?.canIndent) {
+			const analysis = state.field(commonAnalysisState, false);
+			if (result.indent && analysis?.complete && !analysis.stale) {
 				const row = formatted.doc.line(number);
 				const candidate = formatted.update({ changes: { from: row.from, to: row.to, insert: text } }).state;
 				const indent = getIndentation(candidate, row.from);
@@ -431,17 +447,6 @@ export class Editor {
 		this.view.dispatch({ effects: this.history.reconfigure(history({ newGroupDelay: 200 })) });
 	}
 
-	setPresentation(data) {
-		const { decorations = [], sectionStarts = [], syntaxHighlights = [], ...presentation } = data ?? {};
-		this.view.dispatch({ effects: [
-			setPresentation.of(data ? presentation : null),
-			setStructure.of(decorations),
-			setSectionStarts.of(sectionStarts),
-			setSyntaxHighlights.of(syntaxHighlights),
-		] });
-		this.refresh();
-	}
-
 	setCommonAnalysis(data) {
 		this.view.dispatch({ effects: setCommonAnalysis.of(data) });
 	}
@@ -482,7 +487,7 @@ export class Editor {
 	refresh() {
 		if (this.view) {
 			refreshStructure(this.view);
-			refreshFunctionLineNumbers(this.view);
+			refreshFunctionScrollMarkers(this.view);
 			refreshIndentRulers(this.view);
 		}
 	}

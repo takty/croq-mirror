@@ -150,43 +150,6 @@
 	text-shadow: none;
 }
 
-.croq-mirror .cm-editor :is(.cm-matchingBracket, .cm-bracket-gutter-mark) {
-	background: transparent;
-	color: inherit;
-	font-weight: bold;
-	position: relative;
-	isolation: isolate;
-}
-.croq-mirror .cm-editor .cm-bracket-gutter-overlay {
-	position: absolute;
-	z-index: 4;
-	overflow: hidden;
-	pointer-events: none;
-}
-.croq-mirror .cm-editor .cm-bracket-gutter-mark { position: absolute; }
-.croq-mirror .cm-editor :is(.cm-matchingBracket, .cm-bracket-gutter-mark)::before {
-	content: '';
-	position: absolute;
-	z-index: -1;
-	top: -0.45em;
-	left: -0.75em;
-	right: -0.75em;
-	bottom: -0.45em;
-	border-radius: 50%;
-	border: 0.5em solid color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
-}
-.croq-mirror .cm-editor .cm-activeLine .cm-matchingBracket::before {
-	top: 0;
-	left: 0.05em;
-	right: 0.05em;
-	bottom: 0;
-	border-radius: 0.25em;
-	border: none;
-	background-color: color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);
-}
-.croq-mirror .cm-editor :is(.cm-syntax-comment .cm-matchingBracket, .cm-matchingBracket.cm-syntax-comment)::before {
-	content: none;
-}
 .croq-mirror .cm-editor .cm-selectionMatch {
 	background: transparent;
 	border-bottom: 2px dotted color-mix(in srgb, var(--croq-mirror-l-aqua) 75%, transparent);

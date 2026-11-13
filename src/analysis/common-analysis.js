@@ -65,6 +65,7 @@ export function createCommonAnalysis(data) {
 		version: data.version,
 		sourceLength: data.sourceLength,
 		complete: data.complete,
+		stale: data.stale === true,
 		structures,
 		declarations,
 		syntax,
@@ -102,7 +103,8 @@ export const setCommonAnalysis = StateEffect.define();
 export const commonAnalysisState = StateField.define({
 	create: () => null,
 	update(value, transaction) {
-		if (transaction.docChanged || transaction.isUserEvent('load')) value = null;
+		if (transaction.isUserEvent('load')) value = null;
+		else if (transaction.docChanged && value) value = mapAnalysis(value, transaction);
 		for (const effect of transaction.effects) {
 			if (!effect.is(setCommonAnalysis)) continue;
 			if (effect.value === null) {
@@ -119,3 +121,61 @@ export const commonAnalysisState = StateField.define({
 		return value;
 	},
 });
+
+function mapAnalysis(analysis, transaction) {
+	const mapRange = (range, discardInterior, preserveLayout) => {
+		let affected = false;
+		transaction.changes.iterChanges((from, to, newFrom, newTo) => {
+			if (from === to) {
+				if (discardInterior && from > range.from && from < range.to &&
+					(!preserveLayout || !isSafeLayoutInsertion(transaction, from, newFrom, newTo))) affected = true;
+			} else if (from < range.to && to > range.from) {
+				affected = true;
+			}
+		});
+		if (affected) return null;
+		const from = transaction.changes.mapPos(range.from, 1);
+		const to = transaction.changes.mapPos(range.to, -1);
+		return from < to ? { ...range, from, to } : null;
+	};
+	const mapRanges = (ranges, discardInterior, preserveLayout = false) =>
+		ranges.map(range => mapRange(range, discardInterior, preserveLayout)).filter(Boolean);
+	const structures = mapRanges(analysis.structures, true, true).map(item => ({
+		...item,
+		branches: item.branches.map(position => transaction.changes.mapPos(position, 1))
+			.filter(position => position >= item.from && position <= item.to),
+	}));
+	const declarations = mapRanges(analysis.declarations, true);
+	const syntax = mapRanges(analysis.syntax, true);
+	const references = mapRanges(analysis.references, true);
+	const sections = analysis.sections.filter(item => {
+		let affected = false;
+		transaction.changes.iterChanges((from, to) => {
+			if (from < to && from <= item.from && to > item.from) affected = true;
+		});
+		return !affected;
+	}).map(item => ({
+		...item,
+		from: transaction.changes.mapPos(item.from, 1),
+	})).filter(item => item.from < transaction.newDoc.length);
+	return createCommonAnalysis({
+		...analysis,
+		sourceLength: transaction.newDoc.length,
+		stale: true,
+		structures,
+		declarations,
+		syntax,
+		references,
+		sections,
+	});
+}
+
+function isSafeLayoutInsertion(transaction, from, newFrom, newTo) {
+	const inserted = transaction.newDoc.sliceString(newFrom, newTo);
+	if (!/^[ \t]*\n[ \t]*$/.test(inserted)) return false;
+	const line = transaction.startState.doc.lineAt(from);
+	if (/\/\/|\/\*|\*\//.test(line.text)) return false;
+	const prefix = line.text.slice(0, from - line.from), suffix = line.text.slice(from - line.from);
+	return !(/\/\/|\b(?:return|throw|break|continue|yield)\s*$/.test(prefix) && suffix.trim()) &&
+		!(/[\w$]$/.test(prefix) && /^[\w$]/.test(suffix));
+}

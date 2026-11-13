@@ -50,19 +50,3 @@
 .cm-editor.cm-function-line-numbers .cm-activeLineGutter .cm-function-number {
 	color: var(--croq-function-active-number-color, inherit);
 }
-
-.cm-editor.cm-function-line-numbers .cm-section-scroll-markers {
-	position: var(--croq-function-scroll-track-position, absolute);
-	right: var(--croq-function-scroll-track-right, 0);
-	width: var(--croq-function-scroll-marker-track-width, 10px);
-	pointer-events: var(--croq-function-scroll-track-pointer-events, none);
-	z-index: var(--croq-function-scroll-marker-z-index, 3);
-}
-
-.cm-editor.cm-function-line-numbers .cm-section-scroll-markers > span {
-	position: var(--croq-function-scroll-marker-position, absolute);
-	inset-inline: var(--croq-function-scroll-marker-inset, 2px);
-	aspect-ratio: var(--croq-function-scroll-marker-aspect-ratio, 1);
-	border-radius: var(--croq-function-scroll-marker-radius, 50%);
-	background: var(--croq-function-scroll-marker-color, hsl(40 100% 50% / 75%));
-}

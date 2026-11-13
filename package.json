@@ -7,8 +7,11 @@
 	"type": "module",
 	"exports": {
 		".": "./dist/croq-mirror.min.js",
+		"./analysis": "./dist/analysis.js",
 		"./structure": "./dist/structure-view.js",
 		"./function-line-numbers": "./dist/function-line-numbers.js",
+		"./function-scroll-markers": "./dist/function-scroll-markers.js",
+		"./bracket-matching": "./dist/bracket-matching.js",
 		"./gutter-line-selection": "./dist/gutter-line-selection.js",
 		"./indent-rulers": "./dist/indent-rulers.js",
 		"./syntax-highlighting": "./dist/syntax-highlighting.js"

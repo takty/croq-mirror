@@ -68,8 +68,11 @@ async function buildJavaScript() {
 	});
 	await bundle({
 		entryPoints: {
+			'analysis': join(stageRoot, 'analysis', 'common-analysis.js'),
 			'structure-view': join(stageRoot, 'extensions', 'structure-view', 'index.js'),
 			'function-line-numbers': join(stageRoot, 'extensions', 'function-line-numbers', 'index.js'),
+			'function-scroll-markers': join(stageRoot, 'extensions', 'function-scroll-markers', 'index.js'),
+			'bracket-matching': join(stageRoot, 'extensions', 'bracket-matching', 'index.js'),
 			'gutter-line-selection': join(stageRoot, 'extensions', 'gutter-line-selection', 'index.js'),
 			'indent-rulers': join(stageRoot, 'extensions', 'indent-rulers', 'index.js'),
 			'syntax-highlighting': join(stageRoot, 'extensions', 'syntax-highlighting', 'index.js'),
@@ -78,6 +81,13 @@ async function buildJavaScript() {
 		bundle: true,
 		loader: { '.svg': 'base64', '.css': 'text' },
 		packages: 'external',
+		plugins: [{
+			name: 'shared-analysis-entry',
+			setup(build) {
+				build.onResolve({ filter: /(?:^|[/\\])analysis[/\\]common-analysis\.js$/ }, args =>
+					args.kind === 'entry-point' ? null : { path: 'croq-mirror/analysis', external: true });
+			},
+		}],
 		format: 'esm',
 		platform: 'browser',
 		target: 'es2022',

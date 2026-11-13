@@ -1,20 +1,55 @@
 import { Facet, RangeSet, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view';
+import { commonAnalysisState } from '../../analysis/common-analysis.js';
 import { extensionStyles } from '../styles.js';
 import css from './style.css';
 
-const kinds = new Set([
+const syntaxKinds = new Set([
+	'comment', 'keyword', 'operator', 'type', 'function', 'variable', 'literal', 'invalid', 'property',
+]);
+const semanticKinds = new Set([
+	'definition', 'local-variable', 'local-reference', 'variable-reference',
+]);
+const allKinds = new Set([
 	'comment', 'keyword', 'operator', 'type', 'function', 'variable', 'literal', 'invalid',
 	'definition', 'property', 'local-variable', 'local-reference', 'variable-reference',
 ]);
 
 export const setSyntaxHighlights = StateEffect.define();
 const sourceFacet = Facet.define({ combine: sources => sources.at(-1) ?? null });
+const displayOptions = Facet.define({ combine: values => values.at(-1) ?? { syntax: true, semantic: true } });
 
-function decorationsFor(ranges, doc) {
-	return Decoration.set(ranges.map(({ from, to, kind }) => {
+export function syntaxHighlightingOptions(options) {
+	if (!options || typeof options.syntax !== 'boolean' || typeof options.semantic !== 'boolean') {
+		throw new TypeError('Syntax highlighting options must specify syntax and semantic');
+	}
+	return displayOptions.of(options);
+}
+
+function activeRanges(ranges, options) {
+	return ranges.filter(({ kind }) =>
+		(options.syntax && syntaxKinds.has(kind)) || (options.semantic && semanticKinds.has(kind)));
+}
+
+function commonRanges(analysis, options) {
+	const ranges = analysis.syntax.filter(({ kind }) => kind === 'local-variable');
+	if (options.syntax) ranges.push(...analysis.syntax.filter(({ kind }) => syntaxKinds.has(kind)));
+	if (options.semantic) {
+		for (const { from, to, role, scope } of analysis.references) {
+			if (role === 'definition') ranges.push({ from, to, kind: 'definition' });
+			else {
+				ranges.push({ from, to, kind: 'variable-reference' });
+				if (scope === 'local') ranges.push({ from, to, kind: 'local-reference' });
+			}
+		}
+	}
+	return activeRanges(ranges, options);
+}
+
+function decorationsFor(ranges, doc, options) {
+	return Decoration.set(activeRanges(ranges, options).map(({ from, to, kind }) => {
 		if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= to ||
-			to > doc.length || !kinds.has(kind)) {
+			to > doc.length || !allKinds.has(kind)) {
 			throw new RangeError('Invalid syntax highlight range');
 		}
 		return Decoration.mark({ class: `cm-syntax-${kind}` }).range(from, to);
@@ -22,17 +57,48 @@ function decorationsFor(ranges, doc) {
 }
 
 const syntaxHighlights = StateField.define({
-	create: () => ({ decorations: Decoration.none, current: false }),
+	create: () => ({ decorations: Decoration.none, current: false, ranges: [] }),
 	update(value, transaction) {
 		if (transaction.isUserEvent('load')) {
-			value = { decorations: Decoration.none, current: false };
+			value = { decorations: Decoration.none, current: false, ranges: [] };
 		} else if (transaction.docChanged) {
 			const retain = transaction.state.facet(sourceFacet)?.retainOnEdit;
-			value = { decorations: retain ? value.decorations.map(transaction.changes) : Decoration.none, current: false };
+			value = {
+				decorations: retain ? value.decorations.map(transaction.changes) : Decoration.none,
+				current: false,
+				ranges: retain ? value.ranges.map(range => ({
+					...range,
+					from: transaction.changes.mapPos(range.from, 1),
+					to: transaction.changes.mapPos(range.to, -1),
+				})).filter(range => range.from < range.to) : [],
+			};
+		}
+		const common = transaction.state.field(commonAnalysisState, false);
+		const commonChanged = transaction.startState.field(commonAnalysisState, false) !== common;
+		const options = transaction.state.facet(displayOptions);
+		if (commonChanged) {
+			const ranges = common ? commonRanges(common, options) : [];
+			value = {
+				decorations: decorationsFor(ranges, transaction.newDoc, options),
+				current: !!common && !common.stale,
+				ranges,
+			};
+		} else if (transaction.startState.facet(displayOptions) !== options) {
+			const ranges = common ? commonRanges(common, options) : value.ranges;
+			value = {
+				decorations: decorationsFor(ranges, transaction.newDoc, options),
+				current: value.current && !!common && !common.stale,
+				ranges,
+			};
 		}
 		for (const effect of transaction.effects) {
 			if (!effect.is(setSyntaxHighlights)) continue;
-			value = { decorations: decorationsFor(effect.value, transaction.newDoc), current: effect.value.length > 0 };
+			const ranges = effect.value;
+			value = {
+				decorations: decorationsFor(ranges, transaction.newDoc, options),
+				current: ranges.length > 0,
+				ranges: ranges.slice(),
+			};
 		}
 		return value;
 	},
@@ -85,14 +151,16 @@ function reconcileRetainedComments(decorations, ranges, doc, parsedTo) {
 
 function sourceDecorations(state, source) {
 	const supplied = state.field(syntaxHighlights);
-	if (!source || (source.retainOnEdit && supplied.current)) return supplied.decorations;
+	const common = state.field(commonAnalysisState, false);
+	const options = state.facet(displayOptions);
+	if (!source || (common && !common.stale) || (source.retainOnEdit && supplied.current)) return supplied.decorations;
 	const ranges = source.analyze(state);
-	if (!source.retainOnEdit) return RangeSet.join([supplied.decorations, decorationsFor(ranges, state.doc)]);
+	if (!source.retainOnEdit) return decorationsFor(ranges, state.doc, options);
 	const retained = source.reconcileComments
-		? reconcileRetainedComments(supplied.decorations, ranges, state.doc, source.reconcileComments(state))
+		? reconcileRetainedComments(supplied.decorations, activeRanges(ranges, options), state.doc, source.reconcileComments(state))
 		: supplied.decorations;
 	const uncovered = [];
-	for (const range of ranges) {
+	for (const range of activeRanges(ranges, options)) {
 		let from = range.from;
 		retained.between(range.from, range.to, (start, end) => {
 			if (start > from) uncovered.push({ ...range, from, to: Math.min(start, range.to) });
@@ -100,7 +168,7 @@ function sourceDecorations(state, source) {
 		});
 		if (from < range.to) uncovered.push({ ...range, from, to: range.to });
 	}
-	return RangeSet.join([retained, decorationsFor(uncovered, state.doc)]);
+	return RangeSet.join([retained, decorationsFor(uncovered, state.doc, options)]);
 }
 
 const sourceHighlights = ViewPlugin.fromClass(class {

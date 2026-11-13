@@ -1,136 +1,107 @@
 # Internal language interface
 
-This is an internal boundary, not a public plugin API. `src/index.js` selects
-`javascriptLanguage` by default, `javaLanguage` for `codeLanguage: 'java'`, or
-`plainLanguage` for `codeLanguage: null`.
-The code language is selected at creation; display locale (`settings.language`,
-ja/en, default en) is independent and can change at runtime.
-Common implementation modules live directly in `src/`; JavaScript-specific
-modules live in `src/lang/js/`, Java-specific modules in `src/lang/java/`, and
-the inert implementation in `src/lang/plain/`. External library wrappers are generated in
-`.build/lib/`. Splitting the vendor/build outputs is separate follow-up work.
+This is an internal boundary, not a public language-plugin API. `src/index.js`
+selects JavaScript by default, Java for `codeLanguage: 'java'`, or plain text for
+`codeLanguage: null`. The code language is fixed at creation; the UI locale can
+change at runtime.
 
 ## Ownership
 
-- `index.js`: lifecycle, settings, document versions, analysis scheduling and
-  rejection of stale results. Public analysis snapshots keep their original shape.
-- Language module: syntax rules, diagnostics, completion engine and definitions,
-  formatting rules, and conversion of analysis into presentation data.
-- `Editor`: user events, disabled/read-only/IME guards, applying edits, completion
-  menus and diagnostics display.
-- `structureView`: an independent CodeMirror extension that receives decorations
-  and draws them on a canvas; it does not obtain or interpret analysis results.
-  The editor opts into conservative retention of unaffected items during edits;
-  fresh version-checked analysis replaces them.
-- `functionLineNumbers`: an independent CodeMirror extension that receives section
-  start lines and renders numbering and scroll markers without performing analysis.
-- `gutterLineSelection`: an independent CodeMirror extension that handles gutter
-  selection gestures and the line-selection cursor.
-- `indentRulers`: an independent CodeMirror extension for indentation guides.
-- `syntaxHighlightingExtension`: an independent extension that accepts syntax
-  ranges from a language adapter; Java supplies Tree-sitter results through
-  `setSyntaxHighlights`, while JavaScript supplies its Lezer results using
-  `syntaxHighlightingSource`.
+- `index.js` owns editor lifecycle, document versions, worker scheduling, and
+  rejection of stale asynchronous results. Public analysis snapshots retain
+  their existing shape.
+- A language module owns its parser, diagnostics, completion, formatting, and
+  conversion from parser-specific results to common analysis data.
+- `commonAnalysisState` owns the current shared data per editor. It maps ranges
+  unaffected by edits as stale interim data, clears on document load, and only
+  accepts results for the current document version.
+- `Editor` owns the CodeMirror state, settings, and extension assembly. It
+  publishes analysis through `setCommonAnalysis`; display extensions do not
+  call a language module or inspect a parser tree.
+- `structure-view` renders shared structures and declarations on a canvas.
+  `structureViewOptions` independently enables either category.
+- `syntax-highlighting` consumes common syntax and references while allowing
+  synchronous language-provided interim syntax ranges.
+- `function-line-numbers` and `function-scroll-markers` independently consume
+  common function sections. They do not depend on one another.
+- `bracket-matching` combines CodeMirror's standard bracket matching with the
+  component's gutter indicators. It does not scan the whole document for
+  unmatched brackets.
+- `gutterLineSelection` and `indentRulers` handle their own display behavior.
 
-The language module receives no `Editor` instance or private fields. It must not
-replace document text; the view applies formatting results with its editing guards.
-Every language supplies all methods, including plain text. The coordinator and
-view call the same interface without checking service availability. Plain's
-analysis client has an already-resolved `ready`, a `request` returning null, and
-an inert `destroy`; it creates no worker. Its completion session invokes callbacks
-with null and otherwise does nothing. Diagnostics return an empty array; formatting
-and completion triggers return null. Common scheduling and event handling still run.
-Null/empty results mean there is nothing to apply, not a missing service.
+The view never lets a language replace document text. It applies formatting
+results through its own editing guards. Every language supplies the same
+interface, including plain text. Plain text returns no analysis, no diagnostics,
+and no completion or formatting result; it creates no worker.
 
-## Language methods
+## Language members
 
 | Member | Contract |
 | --- | --- |
-| `extensions` | CodeMirror extensions for syntax, highlighting, and bracket behavior |
-| `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`; the client owns any worker; request resolves to a snapshot or null |
-| `analysisData(analysis, state, version)` | Converts a current parser snapshot to the shared analysis format for the editor state; does not mutate or replace the public snapshot |
-| `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error/warning |
-| `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }`; the view owns the debounce timer and menu state |
-| `createCompletionSession()` | Creates per-editor completion state; see below |
-| `formatLine(text, options)` | Returns `null` to skip, or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, `tabSize` |
-| `presentation(analysis)` | Returns the display data below without mutating the public analysis result |
+| `extensions` | Language-specific CodeMirror syntax and synchronous interim sources; no display assembly |
+| `supportsFunctionSections` | Whether the language can provide function or method section data |
+| `supportsBracketMatching` | Whether the language supports the shared bracket-matching display |
+| `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`; `request` resolves to a snapshot or null |
+| `analysisData(analysis, state, version)` | Converts a parser snapshot into the shared analysis schema for this document |
+| `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error or warning |
+| `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }` |
+| `createCompletionSession()` | Creates per-editor completion state; callbacks use UTF-16 document offsets |
+| `formatLine(text, options)` | Returns `null` or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, and `tabSize` |
 
-`formatLine` receives a line with a trailing newline, preserving the original
-formatter behavior. The view rejects multiline results. `indent` requests the
-existing CodeMirror indent operation, permitted only when `canIndent` is true.
+`formatLine` receives a line with a trailing newline. The view rejects multiline
+results. An `indent` result requests CodeMirror indentation only when current,
+complete common analysis permits it.
 
-A completion session provides `setDefinitions(definitions)`,
-`complete({ state, pos, allowShort }, callback)`, `argumentHint(state, pos)` and `destroy()`.
-Completion callbacks receive `null` or `{ from, to, list }` with UTF-16 document
-offsets and items containing `text`, `displayText`, and optional `className` and `detail`.
-The view uses CodeMirror's completion UI.
-Callbacks from a replaced/destroyed engine must not publish old candidates.
-The view owns and destroys the session. Shared language objects hold no mutable
-per-editor state.
+Completion sessions provide `setDefinitions(definitions)`,
+`complete({ state, pos, allowShort }, callback)`, `argumentHint(state, pos)`, and
+`destroy()`. Callbacks from replaced or destroyed engines must not publish old
+candidates. Shared language objects hold no mutable per-editor state.
 
-Argument hints return `null` or `{ pos, name, parameters, result, active }`.
-The view renders that data as a tooltip at the supplied document offset.
+Argument hints return `null` or `{ pos, name, parameters, result, active }`; the
+view renders them as a tooltip at the supplied document offset.
 
-## Presentation data
+## Common analysis data
 
-All internal display positions are **zero-based `{ line, ch }`**, with UTF-16
-columns and exclusive ends. The JS adapter converts Acorn's one-based positions.
-The public `getAnalysis()` result remains unchanged, including its original
-coordinate conventions.
+`analysisData()` returns a validated snapshot with `version`, `sourceLength`,
+`complete`, `structures`, `declarations`, `syntax`, `references`, and `sections`.
+All positions are zero-based UTF-16 offsets from the document start; ranges have
+exclusive ends. `complete` indicates whether the source parse was complete.
+An unavailable or incomplete category is represented with the best valid
+partial data available, not parser-specific node names.
 
-```js
-{
-  canIndent: true,
-  lineNumbers: 'sections', // 'absolute' forces ordinary numbering; omission permits sections
-  sectionStarts: [0, 12], // ordered zero-based section start lines
-  decorations: [
-    {
-      kind: 'range', from, to, fill, opacity, // opacity is optional, default 1
-      spineChars: 3, branchChars: 4,
-      branches: [] // positions of intermediate range branches
-    },
-    { kind: 'token', from, to, fill, stroke }
-  ]
-}
-```
+- Structures use the shared kinds `function`, `class`, `conditional`, and
+  `loop`, with optional branch offsets.
+- Declarations use `kind: 'variable'`, normalized mutability (`mutable`,
+  `immutable`, or `unknown`), and scope (`function`, `lexical`, `member`,
+  `parameter`, or `unknown`).
+- Syntax ranges use shared classifications such as `keyword`, `comment`,
+  `literal`, `type`, `definition`, and `variable-reference`.
+- References distinguish definitions from references and mark lexical local
+  references when known.
+- Sections identify function or method starts by offset.
 
-Decorations are drawn in array order. The adapter chooses colors, ranges and
-character spans; the structure extension resolves `var(--property, fallback)`
-colors on repaint, converts positions to pixels and draws the shapes.
-JavaScript and Java provide class ranges using `--croq-mirror-l-red` at 15% opacity.
-Plain supplies `lineNumbers: 'absolute'` and empty decorations/section starts.
-Java supplies method and lambda section starts and structural decorations from
-Tree-sitter nodes. Neither the renderer nor section numbering reads `fnLocs`,
-`ifLocs`, `constLocs` or any other JavaScript analysis field.
+The shared snapshot lives in the per-editor `commonAnalysisState` field.
+Unchanged ranges may be mapped across edits and marked `stale` until the next
+version-checked worker result arrives. A document load clears the snapshot.
+Disabling `analysis` clears parser data; changing display settings does not
+schedule another parse. Public `getAnalysis()` and `analysis` event shapes do
+not include the internal common snapshot and remain compatible.
 
-`setPresentation()` without an argument clears display data. Document edits and
-disabling automatic analysis clear the data; explicit analysis while disabled
-returns a snapshot without restoring the display.
+The standalone `croq-mirror/analysis` export provides the state, effect, and
+validator for composing the shared-data extensions outside the component. Each
+standalone extension resolves this same package subpath so its state-field
+identity remains consistent.
 
-The syntax highlighting extension accepts `{ from, to, kind }` ranges using
-zero-based UTF-16 document offsets. The language adapter maps parser-specific
-positions before supplying them. By default the extension clears those ranges
-after document changes. Java opts into retaining mapped ranges between edits and
-uses its CodeMirror syntax tree to color uncovered positions until the worker
-returns fresh Tree-sitter token and lexical local-reference ranges. Loading a
-document clears retained ranges. JavaScript sends its syntax and local-reference
-ranges from its own synchronous Lezer analysis. Java diagnostics, completion, and
-formatting are not implemented yet.
+## Syntax source and brackets
 
-## Shared analysis data
+The syntax extension can combine fresh shared ranges with a language-provided
+synchronous source while asynchronous parsing is pending. JavaScript supplies
+Lezer ranges; Java supplies CodeMirror syntax-tree ranges until Tree-sitter
+results arrive. Both sources produce the shared extension's generic range
+format. `syntaxHighlight` controls token coloring and `semanticHighlight`
+controls definitions and references independently.
 
-`analysisData()` returns an immutable-by-convention snapshot with `version`,
-`sourceLength`, `complete`, `structures`, `declarations`, `syntax`, `references`,
-and `sections`. All positions are zero-based UTF-16 offsets from the document
-start; ranges have exclusive ends. Structure kinds are `function`, `class`,
-`conditional`, and `loop`. Declarations use `kind: 'variable'` plus normalized
-mutability (`mutable`, `immutable`, or `unknown`) and scope (`function`,
-`lexical`, `member`, `parameter`, or `unknown`). References distinguish
-definitions from references and mark lexical local references when known.
-
-The shared snapshot lives in `commonAnalysisState`, a per-editor CodeMirror
-`StateField`. Document edits and document loads clear it. The coordinator accepts
-worker results only for the current document version before publishing either
-the public analysis snapshot or shared data. The public `getAnalysis()` and
-analysis event shapes remain unchanged. Bracket matching remains a CodeMirror
-language extension and is not included in this shared parser data.
+Bracket matching is not part of common analysis. CodeMirror's standard
+`bracketMatching()` handles cursor-adjacent pairs, while the extension adds
+gutter indicators for visible matched brackets. Whole-document unmatched
+bracket reporting is outside this interface.
