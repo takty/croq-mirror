@@ -48,6 +48,7 @@ Null/empty results mean there is nothing to apply, not a missing service.
 | --- | --- |
 | `extensions` | CodeMirror extensions for syntax, highlighting, and bracket behavior |
 | `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`; the client owns any worker; request resolves to a snapshot or null |
+| `analysisData(analysis, state, version)` | Converts a current parser snapshot to the shared analysis format for the editor state; does not mutate or replace the public snapshot |
 | `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error/warning |
 | `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }`; the view owns the debounce timer and menu state |
 | `createCompletionSession()` | Creates per-editor completion state; see below |
@@ -115,3 +116,21 @@ returns fresh Tree-sitter token and lexical local-reference ranges. Loading a
 document clears retained ranges. JavaScript sends its syntax and local-reference
 ranges from its own synchronous Lezer analysis. Java diagnostics, completion, and
 formatting are not implemented yet.
+
+## Shared analysis data
+
+`analysisData()` returns an immutable-by-convention snapshot with `version`,
+`sourceLength`, `complete`, `structures`, `declarations`, `syntax`, `references`,
+and `sections`. All positions are zero-based UTF-16 offsets from the document
+start; ranges have exclusive ends. Structure kinds are `function`, `class`,
+`conditional`, and `loop`. Declarations use `kind: 'variable'` plus normalized
+mutability (`mutable`, `immutable`, or `unknown`) and scope (`function`,
+`lexical`, `member`, `parameter`, or `unknown`). References distinguish
+definitions from references and mark lexical local references when known.
+
+The shared snapshot lives in `commonAnalysisState`, a per-editor CodeMirror
+`StateField`. Document edits and document loads clear it. The coordinator accepts
+worker results only for the current document version before publishing either
+the public analysis snapshot or shared data. The public `getAnalysis()` and
+analysis event shapes remain unchanged. Bracket matching remains a CodeMirror
+language extension and is not included in this shared parser data.

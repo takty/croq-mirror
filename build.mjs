@@ -46,6 +46,7 @@ async function buildJavaScript() {
 		if (file.endsWith('.js')) await copyFileIfChanged(join(root, 'src', file), join(stageRoot, file));
 	}
 	await copyDirectory(join(root, 'src/lang'), join(stageRoot, 'lang'));
+	await copyDirectory(join(root, 'src/analysis'), join(stageRoot, 'analysis'));
 	await copyDirectory(join(root, 'src/extensions'), join(stageRoot, 'extensions'));
 	await copyDirectory(join(root, 'src/res'), join(stageRoot, 'res'));
 	await bundle({

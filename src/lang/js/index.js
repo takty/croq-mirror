@@ -6,6 +6,7 @@ import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/ve
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
 import { syntaxHighlightingExtension, syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
+import { adaptJavaScriptAnalysis } from './analysis-adapter.js';
 import { analyzeSyntax } from './syntax-analysis.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
@@ -23,6 +24,10 @@ export const javascriptLanguage = {
 
 	createAnalysisClient() {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
+	},
+
+	analysisData(analysis, state, version) {
+		return adaptJavaScriptAnalysis(analysis, state.doc.toString(), version, analyzeSyntax(state));
 	},
 
 	diagnostics(text, locale, options = {}) {

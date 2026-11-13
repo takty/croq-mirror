@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { Language, Parser } from 'web-tree-sitter';
+import { adaptJavaAnalysis } from '../src/lang/java/analysis-adapter.js';
 import { analyzeJava } from '../src/lang/java/analyzer.js';
 
 await Parser.init();
@@ -37,6 +38,13 @@ test('Java highlights lexical variable references without confusing declarations
 	try {
 		const result = analyzeJava(source, tree.rootNode);
 		assert.equal(result.success, true);
+		const common = adaptJavaAnalysis(result, 7);
+		assert.equal(common.version, 7);
+		assert.equal(common.sourceLength, source.length);
+		assert.ok(common.structures.some(item => item.kind === 'loop'));
+		assert.ok(common.declarations.some(item =>
+			item.from === source.indexOf('value = arg') && item.mutability === 'immutable'));
+		assert.ok(common.sections.some(item => item.from === source.indexOf('  void run')));
 		const localOffsets = new Set(result.syntaxHighlights
 			.filter(item => item.kind === 'local-reference').map(item => item.from));
 		const offset = (fragment, name) => source.indexOf(fragment) + fragment.indexOf(name);
@@ -117,6 +125,21 @@ test('Java emits class ranges before their methods without changing method secti
 		assert.deepEqual(result.sectionStarts, [1]);
 		assert.ok(result.decorations.indexOf(classes[0]) < result.decorations.findIndex(item =>
 			item.fill === 'hsla(40, 100%, 50%, 0.15)'));
+	} finally {
+		tree.delete();
+	}
+});
+
+test('Java adapter retains bounded partial data for incomplete source', () => {
+	const source = 'class Incomplete { void run( { int value = }';
+	const tree = parser.parse(source);
+	try {
+		const result = analyzeJava(source, tree.rootNode);
+		const common = adaptJavaAnalysis(result, 8);
+		assert.equal(common.complete, false);
+		assert.equal(common.sourceLength, source.length);
+		assert.ok(common.syntax.every(item => item.from >= 0 && item.to <= source.length));
+		assert.ok(common.structures.every(item => item.from >= 0 && item.to <= source.length));
 	} finally {
 		tree.delete();
 	}

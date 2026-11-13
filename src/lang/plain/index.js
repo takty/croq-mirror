@@ -11,6 +11,7 @@ export const plainLanguage = {
 		};
 	},
 
+	analysisData() { return null; },
 	diagnostics() { return []; },
 	completionTrigger() { return null; },
 	formatLine() { return null; },

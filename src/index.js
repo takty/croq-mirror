@@ -147,11 +147,14 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			const result = await client.request(cm.state.doc.toString(), version);
 			if (result === null) return null;
 			if (!destroyed && result.version === version && settings.analysis) {
-				analysis = structuredClone(result);
+				const commonAnalysis = language.analysisData(result, cm.state, version);
+				const snapshot = publicAnalysis(result);
+				analysis = structuredClone(snapshot);
+				view.setCommonAnalysis(commonAnalysis);
 				view.setPresentation(language.presentation(result));
-				emit('analysis', result);
+				emit('analysis', snapshot);
 			}
-			return structuredClone(result);
+			return structuredClone(publicAnalysis(result));
 		}
 
 		function handleUpdate(before, transactions) {
@@ -283,6 +286,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				if (!settings.analysis) {
 					clearTimeout(timer);
 					analysis = null;
+					view.setCommonAnalysis(null);
 					view.setPresentation();
 				}
 				applySettings();
@@ -373,6 +377,13 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		dispose();
 		throw error;
 	}
+}
+
+function publicAnalysis(result) {
+	if (!Object.hasOwn(result, 'commonAnalysis')) return result;
+	const snapshot = { ...result };
+	delete snapshot.commonAnalysis;
+	return snapshot;
 }
 
 function changeSource(transaction) {

@@ -11,6 +11,7 @@ import { acceptCompletion, autocompletion, closeBracketsKeymap, closeCompletion,
 import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
+import { commonAnalysisState, setCommonAnalysis } from './analysis/common-analysis.js';
 import { refreshStructure, retainStructureOnEdit, setStructure, structureView } from './extensions/structure-view/index.js';
 import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber, refreshFunctionLineNumbers, sectionNumberState, setSectionStarts } from './extensions/function-line-numbers/index.js';
 import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
@@ -170,6 +171,7 @@ export class Editor {
 				gutterLineSelection,
 				highlightField,
 				argumentHintField,
+				commonAnalysisState,
 				bracketGutterOverlay,
 				lintGutter(),
 				this.options.numbers.of(absoluteLineNumbers),
@@ -438,6 +440,10 @@ export class Editor {
 			setSyntaxHighlights.of(syntaxHighlights),
 		] });
 		this.refresh();
+	}
+
+	setCommonAnalysis(data) {
+		this.view.dispatch({ effects: setCommonAnalysis.of(data) });
 	}
 
 	getSectionLineNumber(line) {

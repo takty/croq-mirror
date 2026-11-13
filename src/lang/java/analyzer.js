@@ -1,4 +1,5 @@
 import { createLocalVariables, isVariableReference } from './syntax-analysis.js';
+import { referencesFromSyntax } from '../../analysis/common-analysis.js';
 
 const KEYWORDS = new Set([
 	'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
@@ -50,6 +51,8 @@ export function analyzeJava(source, rootNode) {
 	const syntaxHighlights = [];
 	const sectionStarts = new Set();
 	const decorations = [];
+	const structures = [];
+	const declarations = [];
 	const lineStarts = [0];
 	for (let i = 0; i < source.length; i++) {
 		if (source.charCodeAt(i) === 10) lineStarts.push(i + 1);
@@ -73,13 +76,15 @@ export function analyzeJava(source, rootNode) {
 		if (from !== undefined && to !== undefined) syntaxHighlights.push({ from, to, kind });
 	}
 
-	function addRange(node, fill, branches = [], opacity) {
+	function addRange(node, kind, fill, branches = [], opacity) {
 		const from = toOffset(node.startIndex), to = toOffset(node.endIndex);
 		if (from === undefined || to === undefined || to <= from) return;
+		const branchOffsets = branches.filter(Number.isInteger);
+		structures.push({ kind, from, to, branches: branchOffsets });
 		decorations.push({
 			kind: 'range', from: positionAt(from), to: positionAt(to), fill,
 			...(opacity === undefined ? {} : { opacity }),
-			spineChars: 3, branchChars: 4, branches,
+			spineChars: 3, branchChars: 4, branches: branchOffsets.map(positionAt),
 		});
 	}
 
@@ -92,6 +97,12 @@ export function analyzeJava(source, rootNode) {
 		if (from === undefined || to === undefined || from >= to) return;
 		const modifiers = declaration.namedChildren.find(child => child.type === 'modifiers');
 		const isFinal = modifiers && /\bfinal\b/.test(textOf(modifiers));
+		const scope = declaration.type === 'field_declaration' ? 'member' : 'lexical';
+		declarations.push({
+			kind: 'variable', from, to,
+			mutability: isFinal ? 'immutable' : 'mutable',
+			scope,
+		});
 		decorations.push({
 			kind: 'token', from: positionAt(from), to: positionAt(to),
 			fill: isFinal ? 'hsla(240, 75%, 97%, 1)' : 'hsla(205, 100%, 97%, 1)',
@@ -107,21 +118,21 @@ export function analyzeJava(source, rootNode) {
 		if (node.isMissing) return;
 		locals.enter(node);
 		if (node.type === 'class_declaration') {
-			addRange(node, 'var(--croq-mirror-l-red, #e61e58)', [], 0.15);
+			addRange(node, 'class', 'var(--croq-mirror-l-red, #e61e58)', [], 0.15);
 		} else if (FUNCTION_NODES.has(node.type)) {
 			const start = toOffset(node.startIndex);
 			if (start !== undefined) {
 				const position = positionAt(start);
 				sectionStarts.add(position.line);
-				addRange(node, 'hsla(40, 100%, 50%, 0.15)');
+				addRange(node, 'function', 'hsla(40, 100%, 50%, 0.15)');
 			}
 		} else if (CONDITIONAL_NODES.has(node.type)) {
 			const alternative = node.childForFieldName('alternative');
 			const branchOffset = alternative ? toOffset(alternative.startIndex) : undefined;
-			const branches = branchOffset === undefined ? [] : [positionAt(branchOffset)];
-			addRange(node, 'hsla(150, 100%, 35%, 0.15)', branches);
+			const branches = branchOffset === undefined ? [] : [branchOffset];
+			addRange(node, 'conditional', 'hsla(150, 100%, 35%, 0.15)', branches);
 		} else if (LOOP_NODES.has(node.type)) {
-			addRange(node, 'hsla(190, 90%, 50%, 0.20)');
+			addRange(node, 'loop', 'hsla(190, 90%, 50%, 0.20)');
 		}
 		if (node.type.includes('comment')) {
 			add(node, 'comment');
@@ -155,11 +166,23 @@ export function analyzeJava(source, rootNode) {
 
 	visit(rootNode);
 	syntaxHighlights.sort((a, b) => a.from - b.from || a.to - b.to);
+	const references = referencesFromSyntax(syntaxHighlights);
+	const sections = [...sectionStarts].sort((a, b) => a - b)
+		.map(line => ({ kind: 'function', from: lineStarts[line] }));
 	return {
 		success: !rootNode.hasError,
 		syntaxHighlights,
 		sectionStarts: [...sectionStarts].sort((a, b) => a - b),
 		decorations,
+		commonAnalysis: {
+			sourceLength: source.length,
+			complete: !rootNode.hasError,
+			structures,
+			declarations,
+			syntax: syntaxHighlights,
+			references,
+			sections,
+		},
 	};
 }
 
