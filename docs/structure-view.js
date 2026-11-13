@@ -1,5 +1,5 @@
 // .build/extensions/structure-view/index.js
-import { StateEffect, StateField, countColumn } from "@codemirror/state";
+import { Facet, StateEffect, StateField, countColumn } from "@codemirror/state";
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
 
 // .build/extensions/styles.js
@@ -28,10 +28,59 @@ var style_default = ".cm-editor.cm-structure-view .cm-scroller {\r\n	z-index: va
 
 // .build/extensions/structure-view/index.js
 var setStructure = StateEffect.define();
+var retainOnEditFacet = Facet.define({ combine: (values) => values.some(Boolean) });
+var retainStructureOnEdit = retainOnEditFacet.of(true);
+function mapUnchangedStructure(items, transaction) {
+  const oldDoc = transaction.startState.doc, newDoc = transaction.newDoc;
+  const affected = [];
+  let unsafeFrom = Infinity;
+  transaction.changes.iterChanges((from, to, newFrom, newTo) => {
+    const first = oldDoc.lineAt(from).number - 1, last = oldDoc.lineAt(to).number - 1;
+    const removed = oldDoc.sliceString(from, to), inserted = newDoc.sliceString(newFrom, newTo);
+    const changed = removed + inserted;
+    const oldContext = oldDoc.sliceString(Math.max(0, from - 1), Math.min(oldDoc.length, to + 1));
+    const newContext = newDoc.sliceString(Math.max(0, newFrom - 1), Math.min(newDoc.length, newTo + 1));
+    const line = oldDoc.lineAt(from);
+    const prefix = line.text.slice(0, from - line.from), suffix = line.text.slice(from - line.from);
+    const newlineInsertion = from === to && /^[ \t\n]*\n[ \t\n]*$/.test(inserted) && !(/\/\/|\b(?:return|throw|break|continue|yield)\s*$/.test(prefix) && suffix.trim()) && !(/[\w$]$/.test(prefix) && /^[\w$]/.test(suffix));
+    const indentation = transaction.isUserEvent("format") && /^[ \t]*$/.test(changed) && /^[ \t]*$/.test(line.text.slice(0, to - line.from));
+    const layoutOnly = newlineInsertion || indentation;
+    affected.push({ first, last, from, to, layoutOnly });
+    if (!layoutOnly && /[()[\]{}/*'"`\\\n;:,?]/.test(changed) || /\/\/|\/\*|\*\//.test(oldContext + "\n" + newContext)) {
+      unsafeFrom = Math.min(unsafeFrom, first);
+    }
+    if (!layoutOnly && /\b(?:else|catch|finally|while)\b/.test(line.text + "\n" + newDoc.lineAt(newFrom).text)) {
+      let preceding = first;
+      while (preceding > 0 && !oldDoc.line(preceding).text.trim()) preceding--;
+      unsafeFrom = Math.min(unsafeFrom, Math.max(0, preceding - 1));
+    }
+  });
+  const offset = (position) => {
+    const line = oldDoc.line(Math.max(1, Math.min(oldDoc.lines, position.line + 1)));
+    return line.from + Math.max(0, Math.min(line.length, position.ch ?? 0));
+  };
+  const mapPosition = (position, assoc) => {
+    const mapped = transaction.changes.mapPos(offset(position), assoc);
+    const line = newDoc.lineAt(mapped);
+    return { line: line.number - 1, ch: mapped - line.from };
+  };
+  return items.filter((item) => item.to.line < unsafeFrom && !affected.some(({ first, last, from, to, layoutOnly }) => {
+    if (!layoutOnly) return item.from.line <= last && item.to.line >= first;
+    if (item.kind !== "token") return false;
+    const start = offset(item.from), end = offset(item.to);
+    return from < end && to > start || from === to && from > start && from < end;
+  })).map((item) => ({
+    ...item,
+    from: mapPosition(item.from, 1),
+    to: mapPosition(item.to, -1),
+    ...item.kind === "range" ? { branches: item.branches.map((branch) => mapPosition(branch, 1)) } : {}
+  }));
+}
 var structureField = StateField.define({
   create: () => [],
   update(value, transaction) {
-    if (transaction.docChanged || transaction.isUserEvent("load")) value = [];
+    if (transaction.isUserEvent("load")) value = [];
+    else if (transaction.docChanged) value = transaction.state.facet(retainOnEditFacet) ? mapUnchangedStructure(value, transaction) : [];
     for (const effect of transaction.effects) if (effect.is(setStructure)) value = effect.value;
     return value;
   }
@@ -191,6 +240,7 @@ function fill(ctx, x, y, width, height, radii) {
 }
 export {
   refreshStructure,
+  retainStructureOnEdit,
   setStructure,
   structureView
 };

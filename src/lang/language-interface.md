@@ -20,6 +20,8 @@ the inert implementation in `src/lang/plain/`. External library wrappers are gen
   menus and diagnostics display.
 - `structureView`: an independent CodeMirror extension that receives decorations
   and draws them on a canvas; it does not obtain or interpret analysis results.
+  The editor opts into conservative retention of unaffected items during edits;
+  fresh version-checked analysis replaces them.
 - `functionLineNumbers`: an independent CodeMirror extension that receives section
   start lines and renders numbering and scroll markers without performing analysis.
 - `gutterLineSelection`: an independent CodeMirror extension that handles gutter

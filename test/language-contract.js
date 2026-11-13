@@ -4,7 +4,7 @@ import { plainLanguage } from '../.build/lang/plain/index.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
 import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
-import { setStructure, structureView } from '../dist/structure-view.js';
+import { retainStructureOnEdit, setStructure, structureView } from '../dist/structure-view.js';
 import { functionLineNumbers, getSectionLineNumber, setSectionStarts } from '../dist/function-line-numbers.js';
 import { gutterLineSelection, setLineSelectionMode } from '../dist/gutter-line-selection.js';
 import { indentRulers } from '../dist/indent-rulers.js';
@@ -123,6 +123,102 @@ export async function runLanguageContractTests(assert) {
 		assert(await waitForPaint(true), 'standalone structure can be supplied again after editing');
 		standalone.dispatch({ userEvent: 'load' });
 		assert(await waitForPaint(false), 'load event clears standalone structure even without a document change');
+		standalone.dispatch({
+			changes: { from: 0, to: standalone.state.doc.length, insert: 'header\nfirst\n\nmiddle\nthird' },
+			userEvent: 'load',
+			effects: compartment.reconfigure([structureView, retainStructureOnEdit]),
+		});
+		const token = (line, fill) => ({
+			kind: 'token', from: { line, ch: 0 }, to: { line, ch: 5 }, fill, stroke: fill,
+		});
+		standalone.dispatch({ effects: setStructure.of([
+			token(0, '#ff0000'), token(1, '#00ff00'), token(3, '#ffff00'), token(4, '#0000ff'),
+		]) });
+		const colors = () => {
+			const canvas = host.querySelector('canvas'), ctx = canvas.getContext('2d');
+			const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+			const found = new Set();
+			for (let i = 0; i < pixels.length; i += 4) {
+				if (pixels[i + 3] > 200) found.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
+			}
+			return found;
+		};
+		const waitForColors = async (present, absent = []) => {
+			for (let i = 0; i < 50; i++) {
+				const found = colors();
+				if (present.every(color => found.has(color)) && absent.every(color => !found.has(color))) return true;
+				await new Promise(resolve => setTimeout(resolve, 20));
+			}
+			return false;
+		};
+		const red = '255,0,0', green = '0,255,0', yellow = '255,255,0', blue = '0,0,255';
+		assert(await waitForColors([red, green, yellow, blue]), 'retained structure test paints distinct items');
+		const blueTop = () => {
+			const canvas = host.querySelector('canvas'), pixels = canvas.getContext('2d')
+				.getImageData(0, 0, canvas.width, canvas.height).data;
+			for (let i = 0; i < pixels.length; i += 4) {
+				if (pixels[i] === 0 && pixels[i + 1] === 0 && pixels[i + 2] === 255 && pixels[i + 3] > 200) {
+					return Math.floor(i / 4 / canvas.width);
+				}
+			}
+			return -1;
+		};
+		const oldBlueTop = blueTop();
+		standalone.dispatch({ changes: { from: standalone.state.doc.line(3).from, insert: '\n' } });
+		for (let i = 0; i < 50 && blueTop() <= oldBlueTop; i++) await new Promise(resolve => setTimeout(resolve, 20));
+		assert(blueTop() > oldBlueTop && await waitForColors([red, green, yellow, blue]),
+			'unaffected structure follows inserted blank lines');
+		const middle = standalone.state.doc.line(5);
+		standalone.dispatch({ changes: { from: middle.from + 2, insert: 'x' } });
+		assert(await waitForColors([red, green, blue], [yellow]),
+			'editing invalidates affected structure while preserving unrelated items before and after');
+		standalone.dispatch({ changes: { from: middle.from + 2, insert: '/' } });
+		assert(await waitForColors([red, green], [yellow, blue]),
+			'potential lexical changes also invalidate later structure');
+		standalone.dispatch({ effects: setStructure.of([token(5, '#0000ff')]) });
+		assert(await waitForColors([blue], [red, green]), 'fresh structure replaces retained items');
+		standalone.dispatch({
+			changes: { from: 0, to: standalone.state.doc.length, insert: 'if (x) {\n}\n\nthird' },
+			userEvent: 'load',
+		});
+		standalone.dispatch({ effects: setStructure.of([{
+			kind: 'range', from: { line: 0, ch: 0 }, to: { line: 1, ch: 1 }, fill: '#ff0000',
+			spineChars: 3, branchChars: 4, branches: [],
+		}, token(3, '#0000ff')]) });
+		assert(await waitForColors([red, blue]), 'conditional structure is painted before branch edits');
+		standalone.dispatch({ changes: { from: standalone.state.doc.line(3).from, insert: 'else' } });
+		assert(await waitForColors([], [red, blue]),
+			'a new branch invalidates its preceding conditional and later structure');
+		standalone.dispatch({
+			changes: { from: 0, to: standalone.state.doc.length, insert: 'start\nalpha omega\nfinish' },
+			userEvent: 'load',
+		});
+		standalone.dispatch({ effects: setStructure.of([{
+			kind: 'range', from: { line: 0, ch: 0 }, to: { line: 2, ch: 6 }, fill: '#ff0000',
+			spineChars: 3, branchChars: 4, branches: [],
+		}, token(1, '#00ff00'), {
+			...token(1, '#0000ff'), from: { line: 1, ch: 6 }, to: { line: 1, ch: 11 },
+		}]) });
+		assert(await waitForColors([red, green, blue]), 'structure is painted before splitting a line');
+		const previousBlueTop = blueTop();
+		standalone.dispatch({ changes: { from: standalone.state.doc.line(2).from + 5, insert: '\n  ' } });
+		for (let i = 0; i < 50 && blueTop() <= previousBlueTop; i++) await new Promise(resolve => setTimeout(resolve, 20));
+		assert(blueTop() > previousBlueTop && await waitForColors([red, green, blue]),
+			'splitting a line moves tokens and preserves the enclosing structure');
+		standalone.dispatch({ changes: { from: standalone.state.doc.line(2).from + 2, insert: '\n' } });
+		assert(await waitForColors([], [red, green, blue]),
+			'splitting an identifier conservatively invalidates affected structure');
+		standalone.dispatch({
+			changes: { from: 0, to: standalone.state.doc.length, insert: 'start\n// hidden code\nfinish' },
+			userEvent: 'load',
+		});
+		standalone.dispatch({ effects: setStructure.of([token(0, '#ff0000'), token(2, '#0000ff')]) });
+		assert(await waitForColors([red, blue]), 'structure is painted before splitting a line comment');
+		standalone.dispatch({ changes: { from: standalone.state.doc.line(2).from + 9, insert: '\n' } });
+		assert(await waitForColors([red], [blue]),
+			'splitting a line comment invalidates later structure');
+		standalone.dispatch({ userEvent: 'load' });
+		assert(await waitForPaint(false), 'load clears retained structure');
 		standalone.dispatch({ effects: compartment.reconfigure([]) });
 		assert(!host.querySelector('.cm-structure-overlay') && !host.querySelector('style'),
 			'removing the structure extension removes its canvas and stylesheet');

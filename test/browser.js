@@ -622,6 +622,51 @@ try {
 				'brackets in comments do not receive yellow circles');
 			await waitFor(() => !overlay.children.length, 'comment brackets must not leave a gutter circle');
 		}
+		for (const [editor, root, source, editLine, retainedLine] of [
+			[a, jsRoot, 'function one() {\n let a = 1;\n}\nfunction two() {\n let b = 2;\n}', 1, 3],
+			[javaEditor, javaRoot, 'class Test {\n void one() {\n  int a = 1;\n }\n void two() {\n  int b = 2;\n }\n}', 2, 4],
+		]) {
+			editor.setSettings({ analysis: true, analysisDelay: 10000 });
+			editor.loadDocument(source);
+			await editor.analyzeNow();
+			root.querySelector('.cm-scroller').scrollTop = 0;
+			await wait(150);
+			const alphaOnLine = lineNumber => {
+				const canvas = root.querySelector('.code-structure-view');
+				const line = root.querySelectorAll('.cm-content .cm-line')[lineNumber];
+				if (!canvas?.width || !line) return 0;
+				const scale = devicePixelRatio;
+				const y = Math.max(0, Math.floor((line.getBoundingClientRect().top - canvas.getBoundingClientRect().top) * scale));
+				const height = Math.min(canvas.height - y, Math.ceil(line.getBoundingClientRect().height * scale));
+				if (height <= 0) return 0;
+				const data = canvas.getContext('2d').getImageData(0, y, canvas.width, height).data;
+				return data.reduce((sum, value, index) => sum + (index % 4 === 3 ? value : 0), 0);
+			};
+			await waitFor(() => alphaOnLine(retainedLine) > 0, 'unrelated structure was not initially painted');
+			editor.replaceRange('0', { line: editLine, ch: source.split('\n')[editLine].indexOf('1') });
+			await wait(150);
+			assert(editor.getAnalysis() === null && alphaOnLine(retainedLine) > 0,
+				'editing preserves unaffected structure until fresh analysis: ' + editor.getSettings().codeLanguage);
+			editor.loadDocument(source);
+			await editor.analyzeNow();
+			await wait(150);
+			const headerLine = editor.getSettings().codeLanguage === 'java' ? 1 : 0;
+			const beforeHeader = alphaOnLine(headerLine);
+			const beforeFollowing = alphaOnLine(retainedLine);
+			assert(beforeHeader > 0 && beforeFollowing > 0, 'structure is painted before entering a newline');
+			editor.moveTo({ line: editLine, ch: source.split('\n')[editLine].length });
+			press(root, 'Enter');
+			await waitFor(() => editor.getValue().split('\n').length === source.split('\n').length + 1,
+				'editor did not process newline input');
+			const headerFrames = [];
+			for (let i = 0; i < 10; i++) {
+				await new Promise(resolve => requestAnimationFrame(resolve));
+				headerFrames.push(alphaOnLine(headerLine));
+			}
+			assert(editor.getAnalysis() === null && headerFrames.every(alpha => alpha >= beforeHeader * 0.9) &&
+				alphaOnLine(retainedLine + 1) >= beforeFollowing * 0.9,
+				'newline preserves enclosing and following structures: ' + editor.getSettings().codeLanguage);
+		}
 		a.destroy();
 		javaEditor.setSettings({ analysis: true, analysisDelay: 10000 });
 		const javaEditingSource = 'class Example {\n void run(int arg) {\n  int count = 10;\n  if (count > 0) { use(arg, count); }\n  use(count);\n }\n}';
@@ -640,11 +685,6 @@ try {
 			getComputedStyle(javaToken('local-reference', 'count')).color === referenceColor &&
 			javaToken('operator', '+') && javaToken('literal', '2'),
 			'Java retains existing syntax and local-reference colors and highlights typed tokens before analysis');
-		await waitFor(() => {
-			const canvas = javaRoot.querySelector('.code-structure-view');
-			return canvas && !canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
-				.some((value, index) => index % 4 === 3 && value);
-		}, 'editing must clear stale Java structure backgrounds');
 		javaEditor.replaceRange('\n  boolean active = true;', { line: 2, ch: javaEditor.getValue().split('\n')[2].length });
 		assert(javaToken('keyword', 'boolean') && javaToken('definition', 'active') &&
 			javaToken('literal', 'true') && javaToken('local-reference', 'count'),

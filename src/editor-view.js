@@ -11,7 +11,7 @@ import { acceptCompletion, autocompletion, closeBracketsKeymap, closeCompletion,
 import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
-import { refreshStructure, setStructure, structureView } from './extensions/structure-view/index.js';
+import { refreshStructure, retainStructureOnEdit, setStructure, structureView } from './extensions/structure-view/index.js';
 import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber, refreshFunctionLineNumbers, sectionNumberState, setSectionStarts } from './extensions/function-line-numbers/index.js';
 import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
 import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
@@ -164,6 +164,7 @@ export class Editor {
 				}),
 				presentationField,
 				structureView,
+				retainStructureOnEdit,
 				this.options.rulers.of(indentRulers),
 				sectionNumberState,
 				gutterLineSelection,

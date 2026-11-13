@@ -219,7 +219,16 @@ when the canvas is repainted. An optional `opacity` sets the canvas alpha
 The caller supplies current data in drawing order and is responsible for rejecting
 stale asynchronous analysis results. Treat the supplied array and its contents
 as immutable after dispatch. Document changes or a `load` user event
-clear the display; dispatch `setStructure.of([])` to clear it explicitly. The
+clear the display by default; dispatch `setStructure.of([])` to clear it explicitly.
+The editor opts into `retainStructureOnEdit` (also exported by the extension):
+it discards items spanning edited lines and maps other items to their new
+positions until fresh analysis arrives. Ordinary newline insertions and automatic
+indentation preserve enclosing and shifted structures; splitting an identifier,
+a line comment, or a restricted statement is treated more conservatively.
+Edits to delimiters or comments also discard later items because their
+interpretation may change.
+This is a conservative heuristic, not a syntax analysis; other edits can also
+affect syntax outside the edited lines. A `load` always clears retained data. The
 extension owns and removes its canvas when the editor or extension is destroyed.
 
 ### Function line-number extension
