@@ -17,6 +17,8 @@ change at runtime.
   `analyzer.js` traverses the parser tree and returns the analysis result.
   `common-analysis.js` builds the common snapshot, `scope-analysis.js` resolves
   references, and `lezer-syntax.js` configures the shared Lezer syntax source.
+  `completion.js` provides completion and argument hints. `formatting.js`
+  provides line formatting.
 - `commonAnalysisState` owns the current shared data per editor. It maps surviving
   structure and declaration ranges across edits as stale interim data, clears on document load, and only
   accepts results for the current document version.
@@ -49,18 +51,24 @@ and no completion or formatting result; it creates no worker.
 | `closeBrackets(closeBraces)` | Returns the automatic closing extensions, with optional curly braces |
 | `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`. A worker snapshot includes internal `commonAnalysis`. Plain text resolves to null. |
 | `diagnostics(text, locale, options, client)` | Returns diagnostics synchronously or as a promise. Each item has `message`, `severity` (error or warning), and `from` and `to` as zero-based line and UTF-16 column positions. The client lets Java request diagnostics from its analysis worker independently of structural analysis. |
-| `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }` |
-| `createCompletionSession()` | Creates per-editor completion state; callbacks use UTF-16 document offsets |
-| `formatLine(text, options)` | Returns `null` or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, and `tabSize` |
+| `completionTrigger(key)` | Optional function that returns `null` or `{ delay, allowShort }` |
+| `createCompletionSession()` | Optional factory for per-editor completion and hint state |
+| `formatLine(text, options)` | Optional synchronous function that returns `null` or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, and `tabSize` |
 
 `formatLine` receives a line with a trailing newline. The view rejects multiline
 results. An `indent` result requests CodeMirror indentation only when current,
 complete common analysis permits it.
 
-Completion sessions provide `setDefinitions(definitions)`,
-`complete({ state, pos, allowShort }, callback)`, `argumentHint(state, pos)`, and
-`destroy()`. Callbacks from replaced or destroyed engines must not publish old
-candidates. Shared language objects hold no mutable per-editor state.
+Set unavailable language members to `null`. Commands for unavailable services
+leave the document and selection as they are.
+
+Completion sessions provide `destroy()` and may provide
+`setDefinitions(definitions)`, `complete({ state, pos, allowShort })`, and
+`argumentHint({ state, pos })`. Completion returns `null` or
+`{ from, to, list }`. Completion and hints may return their result directly or
+return a promise. Positions use UTF-16 document offsets. The view discards
+superseded results and results for an outdated document or selection. Shared
+language objects hold no mutable per-editor state.
 
 Argument hints return `null` or `{ pos, name, parameters, result, active }`; the
 view renders them as a tooltip at the supplied document offset.

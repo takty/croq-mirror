@@ -3,6 +3,8 @@ import { EditorView } from '@codemirror/view';
 import { AnalysisClient } from '../../analysis-client.js';
 import { lezerAnalysis } from '../../analysis/lezer-analysis.js';
 import { closeBracketsFor } from '../close-brackets.js';
+import { completionTrigger, createCompletionSession } from './completion.js';
+import { formatLine } from './formatting.js';
 import { lezerSyntax } from './lezer-syntax.js';
 
 export const javaLanguage = {
@@ -22,16 +24,7 @@ export const javaLanguage = {
 	diagnostics(text, locale, _options, client) {
 		return client.request(text, undefined, locale);
 	},
-	completionTrigger() { return null; },
-	formatLine() { return null; },
-
-	createCompletionSession() {
-		return {
-			setDefinitions() {},
-			complete(_options, callback) { callback(null); },
-			argumentHint() { return null; },
-			destroy() {},
-		};
-	},
-
+	completionTrigger,
+	createCompletionSession,
+	formatLine,
 };

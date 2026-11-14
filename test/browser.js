@@ -503,6 +503,13 @@ try {
 		});
 		const javaRoot = document.querySelector('#b');
 		const javaAnalysis = javaEditor.getAnalysis();
+		javaEditor.focus();
+		press(javaRoot, 'a', mod);
+		const javaSelection = javaEditor.getSelection();
+		javaEditor.execute('format');
+		javaEditor.execute('complete');
+		assert(javaSelection === javaSource && javaEditor.getSelection() === javaSelection &&
+			javaEditor.getValue() === javaSource, 'unavailable Java commands preserve the document and selection');
 		const highlighted = (kind, text) => [...javaRoot.querySelectorAll('.cm-syntax-' + kind)]
 			.find(node => node.textContent === text);
 		assert(javaEditor.getSettings().codeLanguage === 'java' && javaAnalysis?.success,

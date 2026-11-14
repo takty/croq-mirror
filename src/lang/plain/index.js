@@ -15,16 +15,8 @@ export const plainLanguage = {
 	},
 
 	diagnostics() { return []; },
-	completionTrigger() { return null; },
-	formatLine() { return null; },
-
-	createCompletionSession() {
-		return {
-			setDefinitions() {},
-			complete(_options, callback) { callback(null); },
-			argumentHint() { return null; },
-			destroy() {},
-		};
-	},
+	completionTrigger: null,
+	createCompletionSession: null,
+	formatLine: null,
 
 };

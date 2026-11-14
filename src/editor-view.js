@@ -111,7 +111,9 @@ export class Editor {
 		this.functionMarkers = false;
 		this.changedLine = null;
 		this.abort = new AbortController();
-		this.session = language.createCompletionSession();
+		this.session = language.createCompletionSession?.() ?? null;
+		this.completionRequest = 0;
+		this.argumentHintRequest = 0;
 		this.history = new Compartment();
 		this.options = {
 			phrases: new Compartment(),
@@ -240,7 +242,7 @@ export class Editor {
 		view.dom.style.fontFamily = settings.fontFamily;
 		view.dom.style.fontSize = settings.fontSize + 'px';
 		view.dom.style.lineHeight = settings.lineHeight + '%';
-		if (!this.canComplete()) this.closeCompletion();
+		if (!this.canUseCompletion()) this.closeCompletion();
 		const previous = this.optionState ?? {};
 		const effects = [];
 		const diagnosticsChanged = previous.diagnosticSource !== diagnosticSource;
@@ -342,14 +344,24 @@ export class Editor {
 		this.refresh();
 	}
 
+	canUseCompletion() {
+		return !!this.session && this.completion && this.enabled && !this.readOnly &&
+			!this.composing && !this.view.compositionStarted && !this.abort.signal.aborted;
+	}
+
 	canComplete() {
-		return this.completion && this.enabled && !this.readOnly && !this.composing && !this.view.compositionStarted;
+		return this.canUseCompletion() && !!this.session.complete;
+	}
+
+	isCurrentCompletionState(state) {
+		const current = this.view.state;
+		return this.canUseCompletion() && current.doc === state.doc && current.selection.eq(state.selection);
 	}
 
 	scheduleCompletion(event) {
 		clearTimeout(this.completionTimer);
 		if (!this.canComplete() || event.isComposing || event.key.length !== 1) return;
-		const trigger = this.language.completionTrigger(event.key);
+		const trigger = this.language.completionTrigger?.(event.key);
 		if (trigger) {
 			this.completionTimer = setTimeout(() => {
 				this.allowShort = trigger.allowShort || completionStatus(this.view.state) === 'active';
@@ -364,42 +376,44 @@ export class Editor {
 	}
 
 	closeCompletion() {
+		this.completionRequest++;
+		this.argumentHintRequest++;
 		clearTimeout(this.completionTimer);
 		closeCompletion(this.view);
 		if (this.view.state.field(argumentHintField)) this.view.dispatch({ effects: setArgumentHint.of(null) });
 	}
 
-	completeAt(context) {
+	async completeAt(context) {
 		if (!this.canComplete()) return null;
 		const snapshot = { state: context.state, pos: context.pos, allowShort: this.allowShort };
-		return new Promise(resolve => {
-			this.session.complete(snapshot, result => {
-				if (!result || context.aborted || !this.canComplete()) return resolve(null);
-				resolve({
-					from: result.from,
-					to: result.to,
-					filter: false,
-					options: result.list.map(item => ({
-						label: item.text,
-						displayLabel: item.displayText,
-						className: item.className,
-						detail: item.detail,
-					})),
-				});
-			});
-		});
+		const request = ++this.completionRequest;
+		const result = await this.session.complete(snapshot);
+		if (!result || context.aborted || request !== this.completionRequest ||
+			!this.isCurrentCompletionState(snapshot.state)) return null;
+		return {
+			from: result.from,
+			to: result.to,
+			filter: false,
+			options: result.list.map(item => ({
+				label: item.text,
+				displayLabel: item.displayText,
+				className: item.className,
+				detail: item.detail,
+			})),
+		};
 	}
 
 	setDefinitions(definitions) {
 		this.closeCompletion();
-		this.session.setDefinitions(definitions);
+		this.session?.setDefinitions?.(definitions);
 	}
 
-	updateArgumentHint() {
-		if (!this.canComplete() || !this.view.state.selection.main.empty) return;
+	async updateArgumentHint() {
+		if (!this.canUseCompletion() || !this.session.argumentHint || !this.view.state.selection.main.empty) return;
 		const { state } = this.view;
-		const hint = this.session.argumentHint(state, state.selection.main.head);
-		if (!hint) return;
+		const request = ++this.argumentHintRequest;
+		const hint = await this.session.argumentHint({ state, pos: state.selection.main.head });
+		if (!hint || request !== this.argumentHintRequest || !this.isCurrentCompletionState(state)) return;
 		this.view.dispatch({ effects: setArgumentHint.of({
 			pos: hint.pos,
 			above: true,
@@ -449,11 +463,13 @@ export class Editor {
 			this.changedLine = null;
 			this.formatLines([line]);
 		}
-		this.updateArgumentHint();
+		this.updateArgumentHint().catch(error => {
+			if (!this.abort.signal.aborted) console.error(error);
+		});
 	}
 
 	formatLines(lines, collapse = false) {
-		if (!this.enabled || this.readOnly) return;
+		if (!this.language.formatLine || !this.enabled || this.readOnly || this.composing || this.view.compositionStarted) return;
 		const { view } = this;
 		const { state } = view;
 		const changes = [];
@@ -564,7 +580,7 @@ export class Editor {
 		this.abort.abort();
 		clearTimeout(this.completionTimer);
 		clearTimeout(this.pointerTimer);
-		this.session.destroy();
+		this.session?.destroy();
 		this.view.destroy();
 	}
 }

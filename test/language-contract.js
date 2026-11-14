@@ -25,14 +25,9 @@ export async function runLanguageContractTests(assert) {
 	await plainClient.ready;
 	assert(await plainClient.request('text', 1) === null, 'plain analysis client returns no result');
 	plainClient.destroy();
-	assert(plainLanguage.diagnostics('invalid JS').length === 0 && plainLanguage.formatLine('text', {}) === null && plainLanguage.completionTrigger('.') === null, 'plain language implements inert diagnostic, formatting and trigger methods');
-	const plainSession = plainLanguage.createCompletionSession();
-	let completed = false;
-	plainSession.setDefinitions([]);
-	assert(plainSession.argumentHint() === null, 'plain language has no argument hints');
-	plainSession.complete({}, result => { completed = result === null; });
-	plainSession.destroy();
-	assert(completed, 'plain completion invokes callback with no candidates');
+	assert(plainLanguage.diagnostics('invalid JS').length === 0 && plainLanguage.formatLine === null &&
+		plainLanguage.completionTrigger === null && plainLanguage.createCompletionSession === null,
+		'plain text advertises unavailable editing services');
 	const source = 'function example() {\n let x = 1;\n if (x) { x++; } else { x--; }\n const y = 2;\n}';
 	const raw = analyze(source);
 	const snapshot = JSON.stringify(raw);
@@ -702,7 +697,7 @@ export async function runLanguageContractTests(assert) {
 	root.className = 'croq-mirror';
 	root.style.cssText = 'height:300px;width:500px;box-sizing:border-box';
 	document.body.prepend(root);
-	let disposed = false, definitions;
+	let disposed = false, definitions, resolveHint;
 	const language = {
 		supportsFunctionSections: true,
 		extensions: [],
@@ -711,8 +706,8 @@ export async function runLanguageContractTests(assert) {
 		formatLine: text => ({ text: text.trimEnd().toUpperCase(), indent: false }),
 		createCompletionSession: () => ({
 			setDefinitions: value => { definitions = value; },
-			complete: (_options, callback) => callback({ from: 0, to: 3, list: [{ text: 'candidate', displayText: 'Generic candidate' }] }),
-			argumentHint: () => null,
+			complete: async () => ({ from: 0, to: 3, list: [{ text: 'candidate', displayText: 'Generic candidate' }] }),
+			argumentHint: () => new Promise(resolve => { resolveHint = resolve; }),
 			destroy() { disposed = true; },
 		}),
 	};
@@ -782,6 +777,15 @@ export async function runLanguageContractTests(assert) {
 		await new Promise(resolve => setTimeout(resolve, 200));
 		assert(root.querySelector('.cm-tooltip-autocomplete')?.textContent.includes('Generic candidate'), 'view displays generic completion candidates');
 		view.closeCompletion();
+		view.view.dispatch({ selection: { anchor: 2 } });
+		const resolveOldHint = resolveHint;
+		view.view.dispatch({ selection: { anchor: 3 } });
+		resolveOldHint({ pos: 0, name: 'oldHint', parameters: [], result: '', active: 0 });
+		await Promise.resolve();
+		assert(!root.querySelector('.cm-tern-arguments'), 'view drops a hint for an old cursor position');
+		resolveHint({ pos: 0, name: 'currentHint', parameters: [], result: '', active: 0 });
+		await Promise.resolve();
+		assert(root.querySelector('.cm-tern-arguments')?.textContent.includes('currentHint'), 'view displays an asynchronous argument hint');
 		view.format();
 		assert(view.view.state.doc.line(1).text === 'ABC', 'view applies language formatting result');
 		view.setOptions({ ...settings, readOnly: true }, phrases, diagnostics);
