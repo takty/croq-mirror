@@ -18,28 +18,28 @@ const scrollMarkers = ViewPlugin.fromClass(class {
 		this.measure = {
 			key: this,
 			read: view => {
-				const root = view.dom.getBoundingClientRect();
-				const scroller = view.scrollDOM;
-				const frame = scroller.getBoundingClientRect();
-				const style = scroller.ownerDocument.defaultView.getComputedStyle(scroller);
-				const borderLeft = parseFloat(style.borderLeftWidth);
-				const borderRight = parseFloat(style.borderRightWidth);
-				const scrollbarWidth = Math.max(0, scroller.offsetWidth - scroller.clientWidth - Math.round(borderLeft + borderRight));
+				const root            = view.dom.getBoundingClientRect();
+				const scroller        = view.scrollDOM;
+				const frame           = scroller.getBoundingClientRect();
+				const style           = scroller.ownerDocument.defaultView.getComputedStyle(scroller);
+				const borderLeft      = parseFloat(style.borderLeftWidth);
+				const borderRight     = parseFloat(style.borderRightWidth);
+				const scrollbarWidth  = Math.max(0, scroller.offsetWidth - scroller.clientWidth - Math.round(borderLeft + borderRight));
 				// Overlay scrollbars reserve no space. Keep a track at the scrollport edge in that case.
-				const trackWidth = scrollbarWidth || 10;
+				const trackWidth      = scrollbarWidth || 10;
 				const scrollbarOnLeft = scroller.clientLeft > Math.round(borderLeft);
-				const edge = scrollbarOnLeft ? frame.left + borderLeft : frame.right - borderRight;
-				const center = edge + (scrollbarOnLeft ? trackWidth : -trackWidth) / 2;
-				const centerInset = root.left + view.dom.clientLeft + view.dom.clientWidth - center;
-				const height = scroller.clientHeight;
-				const markers = scroller.scrollHeight > height ? sectionStarts(view.state).map(line => {
+				const edge            = scrollbarOnLeft ? frame.left + borderLeft : frame.right - borderRight;
+				const center          = edge + (scrollbarOnLeft ? trackWidth : -trackWidth) / 2;
+				const centerInset     = root.left + view.dom.clientLeft + view.dom.clientWidth - center;
+				const height          = scroller.clientHeight;
+				const markers         = scroller.scrollHeight > height ? sectionStarts(view.state).map(line => {
 					const block = view.lineBlockAt(view.state.doc.line(line + 1).from);
 					return (block.top + view.defaultLineHeight / 2) / Math.max(view.contentHeight, 1) * 100;
 				}) : [];
 				return { top: frame.top - root.top, height, centerInset, trackWidth, markers };
 			},
 			write: data => {
-				this.dom.style.top = data.top + 'px';
+				this.dom.style.top    = data.top + 'px';
 				this.dom.style.height = data.height + 'px';
 				this.dom.style.setProperty('--croq-function-scrollbar-center-inset', `${data.centerInset}px`);
 				this.dom.style.setProperty('--croq-function-scrollbar-width', `${data.trackWidth}px`);
@@ -56,8 +56,14 @@ const scrollMarkers = ViewPlugin.fromClass(class {
 	}
 
 	update(update) {
-		if (update.docChanged || update.geometryChanged || update.viewportChanged ||
-			update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false)) this.refresh();
+		if (
+			update.docChanged ||
+			update.geometryChanged ||
+			update.viewportChanged ||
+			update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false)
+		) {
+			this.refresh();
+		}
 	}
 
 	refresh() {

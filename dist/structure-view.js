@@ -59,7 +59,9 @@ function mapUnchangedStructure(items, transaction) {
     }
     if (!layoutOnly && /\b(?:else|catch|finally|while)\b/.test(line.text + "\n" + newDoc.lineAt(newFrom).text)) {
       let preceding = first;
-      while (preceding > 0 && !oldDoc.line(preceding).text.trim()) preceding--;
+      while (preceding > 0 && !oldDoc.line(preceding).text.trim()) {
+        preceding--;
+      }
       unsafeFrom = Math.min(unsafeFrom, Math.max(0, preceding - 1));
     }
   });
@@ -73,9 +75,14 @@ function mapUnchangedStructure(items, transaction) {
     return { line: line.number - 1, ch: mapped - line.from };
   };
   return items.filter((item) => item.to.line < unsafeFrom && !affected.some(({ first, last, from, to, layoutOnly }) => {
-    if (!layoutOnly) return item.from.line <= last && item.to.line >= first;
-    if (item.kind !== "token") return false;
-    const start = offset(item.from), end = offset(item.to);
+    if (!layoutOnly) {
+      return item.from.line <= last && item.to.line >= first;
+    }
+    if (item.kind !== "token") {
+      return false;
+    }
+    const start = offset(item.from);
+    const end = offset(item.to);
     return from < end && to > start || from === to && from > start && from < end;
   })).map((item) => ({
     ...item,
@@ -87,9 +94,16 @@ function mapUnchangedStructure(items, transaction) {
 var structureField = StateField.define({
   create: () => [],
   update(value, transaction) {
-    if (transaction.isUserEvent("load")) value = [];
-    else if (transaction.docChanged) value = transaction.state.facet(retainOnEditFacet) ? mapUnchangedStructure(value, transaction) : [];
-    for (const effect of transaction.effects) if (effect.is(setStructure)) value = effect.value;
+    if (transaction.isUserEvent("load")) {
+      value = [];
+    } else if (transaction.docChanged) {
+      value = transaction.state.facet(retainOnEditFacet) ? mapUnchangedStructure(value, transaction) : [];
+    }
+    for (const effect of transaction.effects) {
+      if (effect.is(setStructure)) {
+        value = effect.value;
+      }
+    }
     return value;
   }
 });
@@ -117,7 +131,9 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     const before = update.startState.field(commonAnalysisState, false);
     const after = update.state.field(commonAnalysisState, false);
     const options = update.state.facet(displayOptions);
-    if (update.docChanged || update.geometryChanged || update.viewportChanged || Boolean(before) !== Boolean(after) || options.structures && before?.structures !== after?.structures || options.declarations && before?.declarations !== after?.declarations || !after && update.startState.field(structureField) !== update.state.field(structureField) || update.startState.facet(displayOptions) !== options) this.refresh();
+    if (update.docChanged || update.geometryChanged || update.viewportChanged || Boolean(before) !== Boolean(after) || options.structures && before?.structures !== after?.structures || options.declarations && before?.declarations !== after?.declarations || !after && update.startState.field(structureField) !== update.state.field(structureField) || update.startState.facet(displayOptions) !== options) {
+      this.refresh();
+    }
   }
   refresh() {
     this.view.requestMeasure(this.measure);
@@ -147,10 +163,16 @@ var structurePlugin = ViewPlugin2.fromClass(class {
       if (measured) {
         const glyphTop = (measured.top + measured.bottom - view.defaultLineHeight) / 2 - frame.top;
         const row = Math.max(0, Math.round((glyphTop - lineTop) / view.defaultLineHeight));
-        return { x: measured.left - left, y: lineTop + row * view.defaultLineHeight };
+        return {
+          x: measured.left - left,
+          y: lineTop + row * view.defaultLineHeight
+        };
       }
       const columns = countColumn(doc.sliceString(block.from, offset), tabSize);
-      return { x: content.left - left + linePadding + columns * view.defaultCharacterWidth, y: lineTop };
+      return {
+        x: content.left - left + linePadding + columns * view.defaultCharacterWidth,
+        y: lineTop
+      };
     };
     const analysis = view.state.field(commonAnalysisState, false);
     const options = view.state.facet(displayOptions);
@@ -159,7 +181,9 @@ var structurePlugin = ViewPlugin2.fromClass(class {
       const start = coords(item.from);
       const end = coords(item.to, -1);
       const fill2 = resolveColor(item.fill);
-      if (item.kind === "token") return { ...item, fill: fill2, stroke: resolveColor(item.stroke), start, end };
+      if (item.kind === "token") {
+        return { ...item, fill: fill2, stroke: resolveColor(item.stroke), start, end };
+      }
       return {
         ...item,
         fill: fill2,
@@ -181,7 +205,15 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     };
   }
   write(data) {
-    Object.assign(this.overlay.style, { left: data.left + "px", top: data.top + "px", width: data.width + "px", height: data.height + "px" });
+    Object.assign(
+      this.overlay.style,
+      {
+        left: data.left + "px",
+        top: data.top + "px",
+        width: data.width + "px",
+        height: data.height + "px"
+      }
+    );
     const scale = this.canvas.ownerDocument.defaultView.devicePixelRatio;
     const { width, height, charWidth, lineHeight, decorations } = data;
     const drawing = JSON.stringify([scale, width, height, charWidth, lineHeight, decorations.map((item) => item.kind === "range" ? [

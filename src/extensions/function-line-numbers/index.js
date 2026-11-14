@@ -18,8 +18,12 @@ export const sectionNumberState = StateField.define({
 			}
 			for (let index = 0; index < starts.length; index++) {
 				const line = starts[index];
-				if (!Number.isInteger(line) || line < 0 || line >= transaction.state.doc.lines ||
-					(index > 0 && line < starts[index - 1])) {
+				if (
+					!Number.isInteger(line) ||
+					line < 0 ||
+					line >= transaction.state.doc.lines ||
+					(index > 0 && line < starts[index - 1])
+				) {
 					throw new RangeError('Section starts must be ordered zero-based document lines');
 				}
 			}
@@ -37,8 +41,11 @@ export function getSectionLineNumber(state, line) {
 	let low = 0, high = starts.length;
 	while (low < high) {
 		const middle = (low + high) >>> 1;
-		if (starts[middle] <= line) low = middle + 1;
-		else high = middle;
+		if (starts[middle] <= line) {
+			low = middle + 1;
+		} else {
+			high = middle;
+		}
 	}
 	return [low, line - (starts[low - 1] ?? 0) + 1];
 }
@@ -54,7 +61,7 @@ class LineNumber extends GutterMarker {
 	constructor(section, line) {
 		super();
 		this.section = section;
-		this.line = line;
+		this.line    = line;
 	}
 
 	eq(other) {
@@ -63,7 +70,7 @@ class LineNumber extends GutterMarker {
 
 	toDOM(view) {
 		const element = view.dom.ownerDocument.createElement('span');
-		const start = this.section > 0 && this.line === 1;
+		const start   = this.section > 0 && this.line === 1;
 		element.className = start ? 'cm-function-number' : 'cm-croq-line-number';
 		element.classList.toggle('cm-function-even', this.section % 2 !== 0);
 		element.textContent = start ? this.section : this.line;

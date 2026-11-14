@@ -65,7 +65,9 @@ function createCommonAnalysis(data) {
   });
   const sections = copyPositions(data.sections, data.sourceLength);
   for (const ranges of [structures, declarations, syntax, references, sections]) {
-    for (const range of ranges) Object.freeze(range);
+    for (const range of ranges) {
+      Object.freeze(range);
+    }
     Object.freeze(ranges);
   }
   return Object.freeze({

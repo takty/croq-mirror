@@ -28,7 +28,9 @@ export { acorn };
 const scope = { tern: {} };
 const tern = scope.tern;
 `;
-	for (const file of ['signal', 'tern', 'def', 'comment', 'infer']) vendor += wrap(await read('tern', `lib/${file}.js`));
+	for (const file of ['signal', 'tern', 'def', 'comment', 'infer']) {
+		vendor += wrap(await read('tern', `lib/${file}.js`));
+	}
 	for (const [name, symbol] of [
 		['jshint', 'lintEn'],
 		['jshint-ja-edu', 'lintJa'],

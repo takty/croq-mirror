@@ -21,13 +21,13 @@ function mapUnchangedStructure(items, transaction) {
 	const affected = [];
 	let unsafeFrom = Infinity;
 	transaction.changes.iterChanges((from, to, newFrom, newTo) => {
-		const first = oldDoc.lineAt(from).number - 1, last = oldDoc.lineAt(to).number - 1;
-		const removed = oldDoc.sliceString(from, to), inserted = newDoc.sliceString(newFrom, newTo);
-		const changed = removed + inserted;
-		const oldContext = oldDoc.sliceString(Math.max(0, from - 1), Math.min(oldDoc.length, to + 1));
-		const newContext = newDoc.sliceString(Math.max(0, newFrom - 1), Math.min(newDoc.length, newTo + 1));
-		const line = oldDoc.lineAt(from);
-		const prefix = line.text.slice(0, from - line.from), suffix = line.text.slice(from - line.from);
+		const first            = oldDoc.lineAt(from).number - 1, last = oldDoc.lineAt(to).number - 1;
+		const removed          = oldDoc.sliceString(from, to), inserted = newDoc.sliceString(newFrom, newTo);
+		const changed          = removed + inserted;
+		const oldContext       = oldDoc.sliceString(Math.max(0, from - 1), Math.min(oldDoc.length, to + 1));
+		const newContext       = newDoc.sliceString(Math.max(0, newFrom - 1), Math.min(newDoc.length, newTo + 1));
+		const line             = oldDoc.lineAt(from);
+		const prefix           = line.text.slice(0, from - line.from), suffix = line.text.slice(from - line.from);
 		const newlineInsertion = from === to && /^[ \t\n]*\n[ \t\n]*$/.test(inserted) &&
 			!(/\/\/|\b(?:return|throw|break|continue|yield)\s*$/.test(prefix) && suffix.trim()) &&
 			!(/[\w$]$/.test(prefix) && /^[\w$]/.test(suffix));
@@ -35,13 +35,17 @@ function mapUnchangedStructure(items, transaction) {
 			/^[ \t]*$/.test(line.text.slice(0, to - line.from));
 		const layoutOnly = newlineInsertion || indentation;
 		affected.push({ first, last, from, to, layoutOnly });
-		if ((!layoutOnly && /[()[\]{}/*'"`\\\n;:,?]/.test(changed)) ||
-			/\/\/|\/\*|\*\//.test(oldContext + '\n' + newContext)) {
+		if (
+			(!layoutOnly && /[()[\]{}/*'"`\\\n;:,?]/.test(changed)) ||
+			/\/\/|\/\*|\*\//.test(oldContext + '\n' + newContext)
+		) {
 			unsafeFrom = Math.min(unsafeFrom, first);
 		}
 		if (!layoutOnly && /\b(?:else|catch|finally|while)\b/.test(line.text + '\n' + newDoc.lineAt(newFrom).text)) {
 			let preceding = first;
-			while (preceding > 0 && !oldDoc.line(preceding).text.trim()) preceding--;
+			while (preceding > 0 && !oldDoc.line(preceding).text.trim()) {
+				preceding--;
+			}
 			unsafeFrom = Math.min(unsafeFrom, Math.max(0, preceding - 1));
 		}
 	});
@@ -51,20 +55,25 @@ function mapUnchangedStructure(items, transaction) {
 	};
 	const mapPosition = (position, assoc) => {
 		const mapped = transaction.changes.mapPos(offset(position), assoc);
-		const line = newDoc.lineAt(mapped);
+		const line   = newDoc.lineAt(mapped);
 		return { line: line.number - 1, ch: mapped - line.from };
 	};
 	return items.filter(item => item.to.line < unsafeFrom &&
 		!affected.some(({ first, last, from, to, layoutOnly }) => {
-			if (!layoutOnly) return item.from.line <= last && item.to.line >= first;
-			if (item.kind !== 'token') return false;
-			const start = offset(item.from), end = offset(item.to);
+			if (!layoutOnly) {
+				return item.from.line <= last && item.to.line >= first;
+			}
+			if (item.kind !== 'token') {
+				return false;
+			}
+			const start = offset(item.from);
+			const end   = offset(item.to);
 			return from < end && to > start || (from === to && from > start && from < end);
 		}))
 		.map(item => ({
 			...item,
 			from: mapPosition(item.from, 1),
-			to: mapPosition(item.to, -1),
+			to  : mapPosition(item.to, -1),
 			...(item.kind === 'range' ? { branches: item.branches.map(branch => mapPosition(branch, 1)) } : {}),
 		}));
 }
@@ -72,10 +81,16 @@ function mapUnchangedStructure(items, transaction) {
 const structureField = StateField.define({
 	create: () => [],
 	update(value, transaction) {
-		if (transaction.isUserEvent('load')) value = [];
-		else if (transaction.docChanged) value = transaction.state.facet(retainOnEditFacet)
-			? mapUnchangedStructure(value, transaction) : [];
-		for (const effect of transaction.effects) if (effect.is(setStructure)) value = effect.value;
+		if (transaction.isUserEvent('load')) {
+			value = [];
+		} else if (transaction.docChanged) {
+			value = transaction.state.facet(retainOnEditFacet) ? mapUnchangedStructure(value, transaction) : [];
+		}
+		for (const effect of transaction.effects) {
+			if (effect.is(setStructure)) {
+				value = effect.value;
+			}
+		}
 		return value;
 	},
 });
@@ -92,8 +107,8 @@ const structurePlugin = ViewPlugin.fromClass(class {
 		this.overlay.append(this.canvas);
 		view.dom.append(this.overlay);
 		this.measure = {
-			key: this,
-			read: view => this.read(view),
+			key  : this,
+			read : view => this.read(view),
 			write: data => this.write(data),
 		};
 		this.onScroll = () => this.refresh();
@@ -102,15 +117,21 @@ const structurePlugin = ViewPlugin.fromClass(class {
 	}
 
 	update(update) {
-		const before = update.startState.field(commonAnalysisState, false);
-		const after = update.state.field(commonAnalysisState, false);
+		const before  = update.startState.field(commonAnalysisState, false);
+		const after   = update.state.field(commonAnalysisState, false);
 		const options = update.state.facet(displayOptions);
-		if (update.docChanged || update.geometryChanged || update.viewportChanged ||
+		if (
+			update.docChanged ||
+			update.geometryChanged ||
+			update.viewportChanged ||
 			Boolean(before) !== Boolean(after) ||
 			(options.structures && before?.structures !== after?.structures) ||
 			(options.declarations && before?.declarations !== after?.declarations) ||
 			(!after && update.startState.field(structureField) !== update.state.field(structureField)) ||
-			update.startState.facet(displayOptions) !== options) this.refresh();
+			update.startState.facet(displayOptions) !== options
+		) {
+			this.refresh();
+		}
 	}
 
 	refresh() {
@@ -118,59 +139,76 @@ const structurePlugin = ViewPlugin.fromClass(class {
 	}
 
 	read(view) {
-		const root = view.dom.getBoundingClientRect();
+		const root     = view.dom.getBoundingClientRect();
 		const scroller = view.scrollDOM;
-		const frame = scroller.getBoundingClientRect();
-		const content = view.contentDOM.getBoundingClientRect();
-		const window = view.dom.ownerDocument.defaultView;
-		const colors = window.getComputedStyle(view.dom);
+		const frame    = scroller.getBoundingClientRect();
+		const content  = view.contentDOM.getBoundingClientRect();
+		const window   = view.dom.ownerDocument.defaultView;
+		const colors   = window.getComputedStyle(view.dom);
+
 		const resolveColor = value => {
 			const match = /^var\(\s*(--[\w-]+)\s*,\s*(.+)\)$/.exec(value);
 			return match ? colors.getPropertyValue(match[1]).trim() || match[2] : value;
 		};
 		const linePadding = parseFloat(window.getComputedStyle(view.contentDOM)
 			.getPropertyValue('--croq-mirror-line-padding')) || 0;
-		const left = Math.max(frame.left, content.left);
-		const width = Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left));
+		const left   = Math.max(frame.left, content.left);
+		const width  = Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left));
 		const height = scroller.clientHeight;
 		const { doc, tabSize } = view.state;
 		const coords = (pos, side = 1) => {
-			const line = doc.line(Math.max(1, Math.min(doc.lines, pos.line + 1)));
-			const offset = line.from + Math.max(0, Math.min(line.length, pos.ch ?? 0));
+			const line     = doc.line(Math.max(1, Math.min(doc.lines, pos.line + 1)));
+			const offset   = line.from + Math.max(0, Math.min(line.length, pos.ch ?? 0));
 			const measured = view.coordsAtPos(offset, side);
-			const block = view.lineBlockAt(offset);
-			const lineTop = view.documentTop + block.top - frame.top;
+			const block    = view.lineBlockAt(offset);
+			const lineTop  =  view.documentTop + block.top - frame.top;
 			if (measured) {
 				const glyphTop = (measured.top + measured.bottom - view.defaultLineHeight) / 2 - frame.top;
-				const row = Math.max(0, Math.round((glyphTop - lineTop) / view.defaultLineHeight));
-				return { x: measured.left - left, y: lineTop + row * view.defaultLineHeight };
+				const row      = Math.max(0, Math.round((glyphTop - lineTop) / view.defaultLineHeight));
+				return {
+					x: measured.left - left,
+					y: lineTop + row * view.defaultLineHeight
+				};
 			}
 			const columns = countColumn(doc.sliceString(block.from, offset), tabSize);
-			return { x: content.left - left + linePadding + columns * view.defaultCharacterWidth, y: lineTop };
+			return {
+				x: content.left - left + linePadding + columns * view.defaultCharacterWidth,
+				y: lineTop
+			};
 		};
-		const analysis = view.state.field(commonAnalysisState, false);
-		const options = view.state.facet(displayOptions);
-		const source = analysis ? commonDecorations(analysis, doc, options) : view.state.field(structureField);
+		const analysis    = view.state.field(commonAnalysisState, false);
+		const options     = view.state.facet(displayOptions);
+		const source      = analysis ? commonDecorations(analysis, doc, options) : view.state.field(structureField);
 		const decorations = source.map(item => {
 			const start = coords(item.from);
-			const end = coords(item.to, -1);
-			const fill = resolveColor(item.fill);
-			if (item.kind === 'token') return { ...item, fill, stroke: resolveColor(item.stroke), start, end };
+			const end   = coords(item.to, -1);
+			const fill  = resolveColor(item.fill);
+			if (item.kind === 'token') {
+				return { ...item, fill, stroke: resolveColor(item.stroke), start, end };
+			}
 			return {
 				...item, fill, start, end,
-				spine: coords({ ...item.from, ch: item.from.ch + item.spineChars + 1 }, -1).x - start.x - item.spineChars,
+				spine      : coords({ ...item.from, ch: item.from.ch + item.spineChars + 1 }, -1).x - start.x - item.spineChars,
 				branchWidth: coords({ ...item.from, ch: item.from.ch + item.branchChars + 1 }, -1).x - start.x - item.branchChars,
-				branchRows: item.branches.map(branch => coords(branch).y),
+				branchRows : item.branches.map(branch => coords(branch).y),
 			};
 		});
 		return {
-			left: left - root.left, top: frame.top - root.top, width, height,
+			left     : left - root.left, top: frame.top - root.top, width, height,
 			charWidth: view.defaultCharacterWidth, lineHeight: view.defaultLineHeight, decorations,
 		};
 	}
 
 	write(data) {
-		Object.assign(this.overlay.style, { left: data.left + 'px', top: data.top + 'px', width: data.width + 'px', height: data.height + 'px' });
+		Object.assign(
+			this.overlay.style,
+			{
+				left  : data.left + 'px',
+				top   : data.top + 'px',
+				width : data.width + 'px',
+				height: data.height + 'px',
+			}
+		);
 		const scale = this.canvas.ownerDocument.defaultView.devicePixelRatio;
 		const { width, height, charWidth, lineHeight, decorations } = data;
 		const drawing = JSON.stringify([scale, width, height, charWidth, lineHeight, decorations.map(item =>
@@ -198,10 +236,10 @@ export const structureView = [
 
 function commonDecorations(analysis, doc, options) {
 	const colors = {
-		class: ['var(--croq-mirror-l-red, #e61e58)', 0.15],
-		function: ['hsla(40, 100%, 50%, 0.15)'],
+		class      : ['var(--croq-mirror-l-red, #e61e58)', 0.15],
+		function   : ['hsla(40, 100%, 50%, 0.15)'],
 		conditional: ['hsla(150, 100%, 35%, 0.15)'],
-		loop: ['hsla(190, 90%, 50%, 0.20)'],
+		loop       : ['hsla(190, 90%, 50%, 0.20)'],
 	};
 	const position = offset => {
 		const line = doc.lineAt(offset);
@@ -254,9 +292,9 @@ function drawStructure(canvas, { width, height, charWidth, lineHeight, decoratio
 		ctx.globalAlpha = item.opacity ?? 1;
 		ctx.fillStyle = item.fill;
 		if (item.kind === 'range') {
-			const left = start.x + 4;
-			const spine = Math.max(1, item.spine - 4);
-			const top = start.y + padding;
+			const left   = start.x + 4;
+			const spine  = Math.max(1, item.spine - 4);
+			const top    = start.y + padding;
 			const bottom = end.y + padding;
 			fill(ctx, left, top, spine, bottom - top + band, [band / 2, 0, 0, band / 2]);
 			fill(ctx, left + spine, top, width / 2, band, [0, band / 2, band / 2, 0]);

@@ -68,7 +68,9 @@ export async function runLanguageContractTests(assert) {
 			canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value);
 	};
 	const waitForPaint = async expected => {
-		for (let i = 0; i < 50 && !!painted() !== expected; i++) await new Promise(resolve => setTimeout(resolve, 20));
+		for (let i = 0; i < 50 && !!painted() !== expected; i++) {
+			await new Promise(resolve => setTimeout(resolve, 20));
+		}
 		return !!painted() === expected;
 	};
 	try {
@@ -103,7 +105,9 @@ export async function runLanguageContractTests(assert) {
 			return false;
 		};
 		const waitForColor = async (red, blue) => {
-			for (let i = 0; i < 50 && !hasColor(red, blue); i++) await new Promise(resolve => setTimeout(resolve, 20));
+			for (let i = 0; i < 50 && !hasColor(red, blue); i++) {
+				await new Promise(resolve => setTimeout(resolve, 20));
+			}
 			return hasColor(red, blue);
 		};
 		standalone.dispatch({ effects: setStructure.of(classRange) });
@@ -174,7 +178,9 @@ export async function runLanguageContractTests(assert) {
 		};
 		const oldBlueTop = blueTop();
 		standalone.dispatch({ changes: { from: standalone.state.doc.line(3).from, insert: '\n' } });
-		for (let i = 0; i < 50 && blueTop() <= oldBlueTop; i++) await new Promise(resolve => setTimeout(resolve, 20));
+		for (let i = 0; i < 50 && blueTop() <= oldBlueTop; i++) {
+			await new Promise(resolve => setTimeout(resolve, 20));
+		}
 		assert(blueTop() > oldBlueTop && await waitForColors([red, green, yellow, blue]),
 			'unaffected structure follows inserted blank lines');
 		const middle = standalone.state.doc.line(5);
@@ -211,7 +217,9 @@ export async function runLanguageContractTests(assert) {
 		assert(await waitForColors([red, green, blue]), 'structure is painted before splitting a line');
 		const previousBlueTop = blueTop();
 		standalone.dispatch({ changes: { from: standalone.state.doc.line(2).from + 5, insert: '\n  ' } });
-		for (let i = 0; i < 50 && blueTop() <= previousBlueTop; i++) await new Promise(resolve => setTimeout(resolve, 20));
+		for (let i = 0; i < 50 && blueTop() <= previousBlueTop; i++) {
+			await new Promise(resolve => setTimeout(resolve, 20));
+		}
 		assert(blueTop() > previousBlueTop && await waitForColors([red, green, blue]),
 			'splitting a line moves tokens and preserves the enclosing structure');
 		standalone.dispatch({ changes: { from: standalone.state.doc.line(2).from + 2, insert: '\n' } });
@@ -738,14 +746,15 @@ export async function runLanguageContractTests(assert) {
 			EditorSelection.create([EditorSelection.range(0, 2), EditorSelection.cursor(5)]),
 		]) {
 			view.view.dispatch({ selection });
-			assert(!activeLines().length && !activeGutters().length,
-				'any nonempty selection hides active-line and gutter highlighting');
+			assert(view.view.dom.classList.contains('cm-has-selection') && activeLines().length && activeGutters().length,
+				'any nonempty selection marks the editor while retaining standard active-line highlighting');
 		}
 		view.view.dispatch({ selection: EditorSelection.create([EditorSelection.cursor(0), EditorSelection.cursor(5)]) });
-		assert(activeLines().length === 2 && activeGutters().length === 2,
+		assert(!view.view.dom.classList.contains('cm-has-selection') && activeLines().length === 2 && activeGutters().length === 2,
 			'multiple empty cursors highlight their respective lines and gutters');
 		view.view.dispatch({ selection: { anchor: 4 } });
-		assert(activeLines().length === 1 && activeLines()[0].textContent === 'def' && activeGutters().length === 1,
+		assert(!view.view.dom.classList.contains('cm-has-selection') && activeLines().length === 1 &&
+			activeLines()[0].textContent === 'def' && activeGutters().length === 1,
 			'collapsing a selection restores the current line and gutter');
 		view.setDefinitions(['opaque definition']);
 		assert(definitions[0] === 'opaque definition', 'view forwards definitions without interpreting them');

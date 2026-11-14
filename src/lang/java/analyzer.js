@@ -63,8 +63,11 @@ export function analyzeJava(source, rootNode) {
 		let low = 0, high = lineStarts.length;
 		while (low < high) {
 			const middle = (low + high) >>> 1;
-			if (lineStarts[middle] <= offset) low = middle + 1;
-			else high = middle;
+			if (lineStarts[middle] <= offset) {
+				low = middle + 1;
+			} else {
+				high = middle;
+			}
 		}
 		const line = low - 1;
 		return { line, ch: offset - lineStarts[line] };
@@ -170,7 +173,9 @@ export function analyzeJava(source, rootNode) {
 			locals.leave(node);
 			return;
 		}
-		for (let i = 0; i < node.childCount; i++) visit(node.child(i));
+		for (let i = 0; i < node.childCount; i++) {
+			visit(node.child(i));
+		}
 		locals.leave(node);
 	}
 

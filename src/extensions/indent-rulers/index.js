@@ -21,8 +21,8 @@ const rulerPlugin = ViewPlugin.fromClass(class {
 		this.overlay.append(this.ruler);
 		view.dom.append(this.overlay);
 		this.measure = {
-			key: this,
-			read: view => this.read(view),
+			key  : this,
+			read : view => this.read(view),
 			write: data => this.write(data),
 		};
 		this.onScroll = () => this.refresh();
@@ -31,7 +31,9 @@ const rulerPlugin = ViewPlugin.fromClass(class {
 	}
 
 	update(update) {
-		if (update.docChanged || update.geometryChanged || update.viewportChanged) this.refresh();
+		if (update.docChanged || update.geometryChanged || update.viewportChanged) {
+			this.refresh();
+		}
 	}
 
 	refresh() {
@@ -39,27 +41,36 @@ const rulerPlugin = ViewPlugin.fromClass(class {
 	}
 
 	read(view) {
-		const root = view.dom.getBoundingClientRect();
-		const scroller = view.scrollDOM;
-		const frame = scroller.getBoundingClientRect();
-		const content = view.contentDOM.getBoundingClientRect();
-		const line = view.contentDOM.querySelector('.cm-line');
+		const root      = view.dom.getBoundingClientRect();
+		const scroller  = view.scrollDOM;
+		const frame     = scroller.getBoundingClientRect();
+		const content   = view.contentDOM.getBoundingClientRect();
+		const line      = view.contentDOM.querySelector('.cm-line');
 		const lineStart = line
 			? line.getBoundingClientRect().left + parseFloat(view.dom.ownerDocument.defaultView.getComputedStyle(line).paddingLeft)
 			: content.left;
 		const left = Math.max(frame.left, content.left);
+
 		return {
-			left: left - root.left,
-			top: frame.top - root.top,
-			width: Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left)),
-			height: scroller.clientHeight,
-			rulerX: lineStart - left,
+			left     : left - root.left,
+			top      : frame.top - root.top,
+			width    : Math.max(0, Math.min(view.defaultCharacterWidth * 64, frame.left + scroller.clientWidth - left)),
+			height   : scroller.clientHeight,
+			rulerX   : lineStart - left,
 			charWidth: view.defaultCharacterWidth,
 		};
 	}
 
 	write(data) {
-		Object.assign(this.overlay.style, { left: data.left + 'px', top: data.top + 'px', width: data.width + 'px', height: data.height + 'px' });
+		Object.assign(
+			this.overlay.style,
+			{
+				left  : data.left + 'px',
+				top   : data.top + 'px',
+				width : data.width + 'px',
+				height: data.height + 'px',
+			}
+		);
 		this.ruler.style.left = data.rulerX + 'px';
 		this.ruler.style.setProperty('--ruler-character-width', data.charWidth + 'px');
 	}

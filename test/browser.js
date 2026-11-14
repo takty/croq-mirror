@@ -80,10 +80,10 @@ try {
 	press(editorA, 'a', mod);
 	assert(a.getSelection() === a.getValue(), 'select-all shortcut selects the entire document');
 	const selectedLineStyle = getComputedStyle(editorA.querySelector('.cm-line'));
-	assert(!editorA.querySelector('.cm-activeLine') && !editorA.querySelector('.cm-activeLineGutter') &&
-		selectedLineStyle.backgroundColor === 'rgba(0, 0, 0, 0)' && selectedLineStyle.boxShadow === 'none' &&
+	assert(editorA.classList.contains('cm-has-selection') && editorA.querySelector('.cm-activeLine') &&
+		editorA.querySelector('.cm-activeLineGutter') && selectedLineStyle.boxShadow === 'none' &&
 		getComputedStyle(editorA.querySelector('.cm-syntax-literal')).textShadow !== 'none',
-		'JavaScript selection hides active-line and gutter highlighting without suppressing literal shadows');
+		'JavaScript selection hides the active-line frame without suppressing standard classes or literal shadows');
 	await waitFor(() => editorA.querySelector('.cm-selectionBackground'), 'selection is rendered');
 	const selectionColor = () => getComputedStyle(editorA.querySelector('.cm-selectionBackground')).backgroundColor;
 	await waitFor(() => editorA.classList.contains('cm-focused'), 'editor focus is reflected in the selection style');
@@ -103,7 +103,7 @@ try {
 	offCut();
 	a.loadDocument('one\ntwo');
 	const restoredLine = editorA.querySelector('.cm-activeLine');
-	assert(restoredLine && editorA.querySelector('.cm-activeLineGutter') &&
+	assert(!editorA.classList.contains('cm-has-selection') && restoredLine && editorA.querySelector('.cm-activeLineGutter') &&
 		getComputedStyle(restoredLine).backgroundColor !== 'rgba(0, 0, 0, 0)' &&
 		getComputedStyle(restoredLine).boxShadow !== 'none',
 		'collapsing the selection restores active-line and gutter highlighting');
@@ -158,11 +158,15 @@ try {
 		assert(clipboardCalls.join(',') === 'cut,copy,paste', 'clipboard commands delegate to document');
 		clipboardCalls.length = 0;
 		a.setSettings({ readOnly: true });
-		for (const command of ['cut', 'copy', 'paste']) a.execute(command);
+		for (const command of ['cut', 'copy', 'paste']) {
+			a.execute(command);
+		}
 		assert(clipboardCalls.join(',') === 'copy', 'read-only allows copy only');
 		clipboardCalls.length = 0;
 		a.setSettings({ disabled: true });
-		for (const command of ['cut', 'copy', 'paste']) a.execute(command);
+		for (const command of ['cut', 'copy', 'paste']) {
+			a.execute(command);
+		}
 		assert(clipboardCalls.length === 0, 'disabled blocks clipboard commands');
 	} finally {
 		document.execCommand = originalExecCommand;
@@ -471,11 +475,15 @@ try {
 		a.loadDocument('const broken = ;\nordinary text');
 		a.focus();
 		press(plain, 'a', mod);
-		assert(!plain.querySelector('.cm-activeLine') && !plain.querySelector('.cm-activeLineGutter'),
-			'plain-text selection hides active-line and gutter highlighting');
+		assert(plain.querySelector('.cm-editor').classList.contains('cm-has-selection') &&
+			plain.querySelector('.cm-activeLine') && plain.querySelector('.cm-activeLineGutter') &&
+			getComputedStyle(plain.querySelector('.cm-activeLine')).boxShadow === 'none',
+			'plain-text selection hides the active-line frame while retaining standard active-line classes');
 		a.moveTo({ line: 0, ch: 0 });
 		const original = a.getValue();
-		for (const command of ['format', 'complete', 'toggleComment']) a.execute(command);
+		for (const command of ['format', 'complete', 'toggleComment']) {
+			a.execute(command);
+		}
 		a.setDefinitions([{ '!name': 'unused' }]);
 		assert(a.getValue() === original && !document.querySelector('#a .cm-tooltip-autocomplete'), 'language-specific commands leave plain text unchanged');
 		a.replaceRange('!', { line: 1, ch: 13 });
@@ -530,10 +538,13 @@ try {
 			'Java Tree-sitter worker analyzes Java 25 simple source files');
 		javaEditor.focus();
 		press(javaRoot, 'a', mod);
-		assert(!javaRoot.querySelector('.cm-activeLine') && !javaRoot.querySelector('.cm-activeLineGutter'),
-			'Java selection hides active-line and gutter highlighting');
+		assert(javaRoot.querySelector('.cm-editor').classList.contains('cm-has-selection') &&
+			javaRoot.querySelector('.cm-activeLine') && javaRoot.querySelector('.cm-activeLineGutter') &&
+			getComputedStyle(javaRoot.querySelector('.cm-activeLine')).boxShadow === 'none',
+			'Java selection hides the active-line frame while retaining standard active-line classes');
 		javaEditor.moveTo({ line: 0, ch: 0 });
-		assert(javaRoot.querySelector('.cm-activeLine') && javaRoot.querySelector('.cm-activeLineGutter'),
+		assert(!javaRoot.querySelector('.cm-editor').classList.contains('cm-has-selection') &&
+			javaRoot.querySelector('.cm-activeLine') && javaRoot.querySelector('.cm-activeLineGutter'),
 			'Java collapsed selection restores active-line and gutter highlighting');
 		assert(highlighted('keyword', 'void') && highlighted('function', 'main') &&
 			highlighted('type', 'String') && highlighted('literal', '"Hello"') &&

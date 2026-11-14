@@ -16,11 +16,13 @@ function readLezer(state, tree, classifier) {
 		if (from < to) ranges.push({ from, to, kind });
 	};
 	highlightTree(tree, classifier.style, (from, to, classes) => {
-		for (const kind of new Set(classes.split(' '))) classifier.classify(tree, kind, from, to, add);
+		for (const kind of new Set(classes.split(' '))) {
+			classifier.classify(tree, kind, from, to, add);
+		}
 	});
 	classifier.collectInterimReferences?.(tree, state, add);
 	return {
-		syntax: ranges.filter(range => !SEMANTIC_KINDS.has(range.kind)),
+		syntax    : ranges.filter(range => !SEMANTIC_KINDS.has(range.kind)),
 		references: referencesFromSyntax(ranges),
 	};
 }
@@ -28,7 +30,10 @@ function readLezer(state, tree, classifier) {
 function reconcile(interim, parsedTo, analysis) {
 	if (!analysis) return interim;
 	if (!analysis.stale) {
-		return { syntax: analysis.syntax.length ? analysis.syntax : interim.syntax, references: analysis.references };
+		return {
+			syntax    : analysis.syntax.length ? analysis.syntax : interim.syntax,
+			references: analysis.references
+		};
 	}
 	const retainedReferences = new Map(analysis.references.map(reference => [
 		referenceKey(reference), reference,
@@ -37,8 +42,12 @@ function reconcile(interim, parsedTo, analysis) {
 		syntax: [
 			...interim.syntax,
 			...analysis.syntax.flatMap(range => {
-				if (range.from >= parsedTo) return [range];
-				if (range.kind === 'comment' && range.to > parsedTo) return [{ ...range, from: parsedTo }];
+				if (range.from >= parsedTo) {
+					return [range];
+				}
+				if (range.kind === 'comment' && range.to > parsedTo) {
+					return [{ ...range, from: parsedTo }];
+				}
 				return [];
 			}),
 		],
@@ -59,12 +68,14 @@ function referenceKey({ from, to, role }) {
 
 function updateSyntax(state, previous) {
 	const classifier = state.facet(syntaxClassifier);
-	const tree = syntaxTree(state);
-	const analysis = state.field(commonAnalysisState, false);
-	const interim = previous?.tree === tree && previous.doc === state.doc && previous.classifier === classifier
+	const tree       = syntaxTree(state);
+	const analysis   = state.field(commonAnalysisState, false);
+	const interim    = previous?.tree === tree && previous.doc === state.doc && previous.classifier === classifier
 		? previous.interim
 		: { ...readLezer(state, tree, classifier), classifiesLocalReferences: !!classifier.collectInterimReferences };
-	if (previous?.interim === interim && previous.analysis === analysis) return previous;
+	if (previous?.interim === interim && previous.analysis === analysis) {
+		return previous;
+	}
 	return {
 		doc: state.doc,
 		tree,

@@ -16,9 +16,11 @@ export function referencesFromSyntax(syntax) {
 			: ['local-reference', 'variable-reference'].includes(kind) ? 'reference'
 				: null;
 		if (!role) continue;
-		const key = `${role}:${from}:${to}`;
-		const scope = kind === 'local-reference' ? 'local' : 'unknown';
+
+		const key      = `${role}:${from}:${to}`;
+		const scope    = kind === 'local-reference' ? 'local' : 'unknown';
 		const previous = references.get(key);
+
 		if (!previous || scope === 'local') references.set(key, { from, to, role, scope });
 	}
 	return [...references.values()];
@@ -62,14 +64,16 @@ export function createCommonAnalysis(data) {
 	});
 	const sections = copyPositions(data.sections, data.sourceLength);
 	for (const ranges of [structures, declarations, syntax, references, sections]) {
-		for (const range of ranges) Object.freeze(range);
+		for (const range of ranges) {
+			Object.freeze(range);
+		}
 		Object.freeze(ranges);
 	}
 	return Object.freeze({
-		version: data.version,
+		version     : data.version,
 		sourceLength: data.sourceLength,
-		complete: data.complete,
-		stale: data.stale === true,
+		complete    : data.complete,
+		stale       : data.stale === true,
 		structures,
 		declarations,
 		syntax,
@@ -159,7 +163,7 @@ function mapAnalysis(analysis, transaction) {
 			: from === to ? from >= range.from && from <= range.to : from < range.to && to > range.from);
 		if (affected) return null;
 		const from = transaction.changes.mapPos(range.from, 1);
-		const to = transaction.changes.mapPos(range.to, -1);
+		const to   = transaction.changes.mapPos(range.to, -1);
 		return from < to ? { ...range, from, to } : null;
 	};
 	const mapRanges = (ranges, retainOnEdit = false) =>
@@ -170,9 +174,9 @@ function mapAnalysis(analysis, transaction) {
 			.filter(position => position >= item.from && position <= item.to),
 	}));
 	const declarations = mapRanges(analysis.declarations, true);
-	const syntax = mapRanges(analysis.syntax);
-	const references = mapRanges(analysis.references);
-	const sections = analysis.sections.filter(item => !changes.some(({ from, to }) =>
+	const syntax       = mapRanges(analysis.syntax);
+	const references   = mapRanges(analysis.references);
+	const sections     = analysis.sections.filter(item => !changes.some(({ from, to }) =>
 		from <= item.from && to > item.from)).map(item => ({
 		...item,
 		from: transaction.changes.mapPos(item.from, 1),

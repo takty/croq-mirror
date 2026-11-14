@@ -5,7 +5,7 @@ const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFu
 
 export function analyzeReferences(ast) {
 	const definitions = [];
-	const candidates = [];
+	const candidates  = [];
 
 	function bind(node, scope, evaluationScope = scope) {
 		if (!node) return;
@@ -23,7 +23,9 @@ export function analyzeReferences(ast) {
 				bind(node.argument, scope, evaluationScope);
 				break;
 			case 'ArrayPattern':
-				for (const element of node.elements) bind(element, scope, evaluationScope);
+				for (const element of node.elements) {
+					bind(element, scope, evaluationScope);
+				}
 				break;
 			case 'ObjectPattern':
 				for (const property of node.properties) {
@@ -38,9 +40,14 @@ export function analyzeReferences(ast) {
 		if (!node) return;
 		if (FUNCTIONS.has(node.type)) {
 			const parameters = createScope(scope);
-			if (node.type === 'FunctionDeclaration') bind(node.id, scope);
-			else bind(node.id, parameters);
-			for (const param of node.params) bind(param, parameters);
+			if (node.type === 'FunctionDeclaration') {
+				bind(node.id, scope);
+			} else {
+				bind(node.id, parameters);
+			}
+			for (const param of node.params) {
+				bind(param, parameters);
+			}
 			visit(node.body, createScope(parameters, true));
 			return;
 		}
@@ -55,7 +62,9 @@ export function analyzeReferences(ast) {
 		if (node.type === 'SwitchStatement') {
 			visit(node.discriminant, scope);
 			const switchScope = createScope(scope);
-			for (const branch of node.cases) visit(branch, switchScope);
+			for (const branch of node.cases) {
+				visit(branch, switchScope);
+			}
 			return;
 		}
 		if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
@@ -84,19 +93,29 @@ export function analyzeReferences(ast) {
 			case 'Property':
 			case 'MethodDefinition':
 			case 'PropertyDefinition':
-				if (node.computed) visit(node.key, scope);
+				if (node.computed) {
+					visit(node.key, scope);
+				}
 				visit(node.value, scope);
 				return;
 			case 'MemberExpression':
 				visit(node.object, scope);
-				if (node.computed) visit(node.property, scope);
+				if (node.computed) {
+					visit(node.property, scope);
+				}
 				return;
 			case 'ImportDeclaration':
-				for (const specifier of node.specifiers) bind(specifier.local, scope);
+				for (const specifier of node.specifiers) {
+					bind(specifier.local, scope);
+				}
 				return;
 			case 'ExportNamedDeclaration':
 				visit(node.declaration, scope);
-				if (!node.source) for (const specifier of node.specifiers) visit(specifier.local, scope);
+				if (!node.source) {
+					for (const specifier of node.specifiers) {
+						visit(specifier.local, scope);
+					}
+				}
 				return;
 			case 'ExportAllDeclaration':
 			case 'MetaProperty':
@@ -109,7 +128,9 @@ export function analyzeReferences(ast) {
 		}
 		for (const value of Object.values(node)) {
 			if (Array.isArray(value)) {
-				for (const child of value) if (child?.type) visit(child, scope);
+				for (const child of value) {
+					if (child?.type) visit(child, scope);
+				}
 			} else if (value?.type) {
 				visit(value, scope);
 			}
@@ -120,7 +141,9 @@ export function analyzeReferences(ast) {
 	const ranges = definitions.map(node => toReference(node, 'definition', 'unknown'));
 	for (const { node, scope } of candidates) {
 		let owner = scope;
-		while (owner && !owner.bindings.has(node.name)) owner = owner.parent;
+		while (owner && !owner.bindings.has(node.name)) {
+			owner = owner.parent;
+		}
 		ranges.push(toReference(node, 'reference', owner?.parent ? 'local' : 'unknown'));
 	}
 	return ranges.sort((a, b) => a.from - b.from || a.to - b.to);
@@ -128,10 +151,17 @@ export function analyzeReferences(ast) {
 
 function createScope(parent, isVarScope = false) {
 	const scope = { parent, bindings: new Map(), varScope: parent?.varScope };
-	if (isVarScope) scope.varScope = scope;
+	if (isVarScope) {
+		scope.varScope = scope;
+	}
 	return scope;
 }
 
 function toReference(node, role, scope) {
-	return { from: node.start, to: node.end, role, scope };
+	return {
+		from: node.start,
+		to  : node.end,
+		role,
+		scope
+	};
 }

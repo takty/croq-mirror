@@ -1,5 +1,5 @@
-import { Compartment, EditorState, Prec, RangeSet, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
-import { Decoration, EditorView, GutterMarker, drawSelection, gutterLineClass, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
+import { Compartment, EditorState, Prec, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
+import { Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
 import {
 	cursorDocEnd, cursorDocStart, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp,
 	defaultKeymap, deleteLine, history, historyKeymap, indentLess, insertTab,
@@ -38,24 +38,9 @@ const addHighlight = StateEffect.define();
 const removeHighlight = StateEffect.define();
 const hasNoSelection = view => view.state.selection.ranges.every(range => range.empty);
 
-const activeLineDecoration = Decoration.line({ class: 'cm-activeLine' });
-const activeLineGutterMarker = new class extends GutterMarker {
-	elementClass = 'cm-activeLineGutter';
-};
-const activeLines = state => {
-	if (state.selection.ranges.some(range => !range.empty)) return [];
-	return [...new Set(state.selection.ranges.map(range => state.doc.lineAt(range.head).from))].sort((a, b) => a - b);
-};
-const activeLineField = StateField.define({
-	create: activeLines,
-	update(value, transaction) {
-		return transaction.docChanged || transaction.selection ? activeLines(transaction.state) : value;
-	},
-	provide: field => [
-		EditorView.decorations.from(field, lines => Decoration.set(lines.map(line => activeLineDecoration.range(line)))),
-		gutterLineClass.from(field, lines => RangeSet.of(lines.map(line => activeLineGutterMarker.range(line)))),
-	],
-});
+const selectionState = EditorView.editorAttributes.compute(['selection'], state => ({
+	class: state.selection.ranges.some(range => !range.empty) ? 'cm-has-selection' : '',
+}));
 
 const highlightField = StateField.define({
 	create: () => new Map(),
@@ -82,7 +67,9 @@ const argumentHintField = StateField.define({
 	create: () => null,
 	update(value, transaction) {
 		if (transaction.docChanged || transaction.selection || transaction.isUserEvent('load')) value = null;
-		for (const effect of transaction.effects) if (effect.is(setArgumentHint)) value = effect.value;
+		for (const effect of transaction.effects) {
+			if (effect.is(setArgumentHint)) value = effect.value;
+		}
 		return value;
 	},
 	provide: field => showTooltip.from(field),
@@ -100,33 +87,33 @@ export function positionAt(doc, offset) {
 
 export class Editor {
 	constructor({ language, phrases, onFontSizeChange, onUpdate, allowChanges = () => true }, parent) {
-		this.language = language;
-		this.enabled = true;
-		this.readOnly = false;
-		this.phrases = phrases;
-		this.autoFormat = false;
-		this.autoIndent = false;
-		this.completion = true;
-		this.sectionNumbers = false;
-		this.functionMarkers = false;
-		this.changedLine = null;
-		this.abort = new AbortController();
-		this.session = language.createCompletionSession?.() ?? null;
-		this.completionRequest = 0;
+		this.language            = language;
+		this.enabled             = true;
+		this.readOnly            = false;
+		this.phrases             = phrases;
+		this.autoFormat          = false;
+		this.autoIndent          = false;
+		this.completion          = true;
+		this.sectionNumbers      = false;
+		this.functionMarkers     = false;
+		this.changedLine         = null;
+		this.abort               = new AbortController();
+		this.session             = language.createCompletionSession?.() ?? null;
+		this.completionRequest   = 0;
 		this.argumentHintRequest = 0;
-		this.history = new Compartment();
-		this.options = {
-			phrases: new Compartment(),
-			wrapping: new Compartment(),
-			numbers: new Compartment(),
-			structure: new Compartment(),
-			syntax: new Compartment(),
+		this.history             = new Compartment();
+		this.options             = {
+			phrases        : new Compartment(),
+			wrapping       : new Compartment(),
+			numbers        : new Compartment(),
+			structure      : new Compartment(),
+			syntax         : new Compartment(),
 			functionMarkers: new Compartment(),
-			brackets: new Compartment(),
-			closeBrackets: new Compartment(),
-			access: new Compartment(),
-			diagnostics: new Compartment(),
-			rulers: new Compartment(),
+			brackets       : new Compartment(),
+			closeBrackets  : new Compartment(),
+			access         : new Compartment(),
+			diagnostics    : new Compartment(),
+			rulers         : new Compartment(),
 			gutterSelection: new Compartment(),
 		};
 		this.optionState = null;
@@ -166,7 +153,9 @@ export class Editor {
 				this.options.closeBrackets.of([]),
 				keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap]),
 				drawSelection({ cursorBlinkRate: 530 }),
-				activeLineField,
+				highlightActiveLine(),
+				highlightActiveLineGutter(),
+				selectionState,
 				highlightSelectionMatches(),
 				highlightWhitespace(),
 				EditorView.scrollMargins.of(() => ({ top: 32, bottom: 32 })),
@@ -186,11 +175,11 @@ export class Editor {
 				search({ top: true }),
 				autocompletion({
 					activateOnTyping: false,
-					override: [context => this.completeAt(context)],
-					icons: false,
-					addToOptions: [{
+					override        : [context => this.completeAt(context)],
+					icons           : false,
+					addToOptions    : [{
 						position: 10,
-						render: (completion, _state, view) => {
+						render  : (completion, _state, view) => {
 							if (!completion.className) return null;
 							const icon = view.dom.ownerDocument.createElement('span');
 							icon.className = completion.className;
@@ -232,16 +221,18 @@ export class Editor {
 		const view = this.view;
 		const reopenSearch = searchPanelOpen(view.state) && (this.phrases !== phrases || this.readOnly !== settings.readOnly);
 		if (reopenSearch) closeSearchPanel(view);
-		this.phrases = phrases;
-		this.enabled = !settings.disabled;
-		this.readOnly = settings.readOnly;
-		this.autoIndent = settings.autoIndent;
-		this.completion = settings.completion;
-		this.sectionNumbers = settings.analysis && settings.functionLineNumbers && this.language.supportsFunctionSections;
-		this.functionMarkers = settings.analysis && settings.functionScrollMarkers && this.language.supportsFunctionSections;
+
+		this.phrases              = phrases;
+		this.enabled              = !settings.disabled;
+		this.readOnly             = settings.readOnly;
+		this.autoIndent           = settings.autoIndent;
+		this.completion           = settings.completion;
+		this.sectionNumbers       = settings.analysis && settings.functionLineNumbers && this.language.supportsFunctionSections;
+		this.functionMarkers      = settings.analysis && settings.functionScrollMarkers && this.language.supportsFunctionSections;
 		view.dom.style.fontFamily = settings.fontFamily;
-		view.dom.style.fontSize = settings.fontSize + 'px';
+		view.dom.style.fontSize   = settings.fontSize + 'px';
 		view.dom.style.lineHeight = settings.lineHeight + '%';
+
 		if (!this.canUseCompletion()) this.closeCompletion();
 		const previous = this.optionState ?? {};
 		const effects = [];
@@ -298,11 +289,11 @@ export class Editor {
 			let latestRequest = 0;
 			const extension = diagnosticSource ? linter(async stateView => {
 				const { state } = stateView;
-				const { doc } = state;
-				const phrases = state.facet(EditorState.phrases);
-				const request = ++latestRequest;
-				const items = await diagnosticSource(doc.toString());
-				const current = stateView.state;
+				const { doc }   = state;
+				const phrases   = state.facet(EditorState.phrases);
+				const request   = ++latestRequest;
+				const items     = await diagnosticSource(doc.toString());
+				const current   = stateView.state;
 				// CodeMirror also rejects results for an older document.
 				if (request !== latestRequest || current.facet(EditorState.phrases) !== phrases ||
 					this.options.diagnostics.get(current) !== extension) {
@@ -319,25 +310,28 @@ export class Editor {
 		}
 		if (effects.length) view.dispatch({ effects });
 		if (diagnosticsChanged) {
-			if (diagnosticSource) forceLinting(view);
-			else view.dispatch(setDiagnostics(view.state, []));
+			if (diagnosticSource) {
+				forceLinting(view);
+			} else {
+				view.dispatch(setDiagnostics(view.state, []));
+			}
 		}
 		this.optionState = {
 			phrases,
-			lineWrapping: settings.lineWrapping,
-			rulers: settings.rulers,
-			easyLineSelection: settings.easyLineSelection,
-			sectionNumbers: this.sectionNumbers,
-			structureHighlight: settings.structureHighlight,
+			lineWrapping        : settings.lineWrapping,
+			rulers              : settings.rulers,
+			easyLineSelection   : settings.easyLineSelection,
+			sectionNumbers      : this.sectionNumbers,
+			structureHighlight  : settings.structureHighlight,
 			declarationHighlight: settings.declarationHighlight,
-			syntaxHighlight: settings.syntaxHighlight,
-			semanticHighlight: settings.semanticHighlight,
-			functionMarkers: this.functionMarkers,
+			syntaxHighlight     : settings.syntaxHighlight,
+			semanticHighlight   : settings.semanticHighlight,
+			functionMarkers     : this.functionMarkers,
 			bracketsEnabled,
-			closeBrackets: settings.closeBrackets,
-			closeBraces: settings.closeBraces,
-			readOnly: this.readOnly,
-			enabled: this.enabled,
+			closeBrackets       : settings.closeBrackets,
+			closeBraces         : settings.closeBraces,
+			readOnly            : this.readOnly,
+			enabled             : this.enabled,
 			diagnosticSource,
 		};
 		if (reopenSearch && this.enabled) openSearchPanel(view);
@@ -386,21 +380,22 @@ export class Editor {
 	async completeAt(context) {
 		if (!this.canComplete()) return null;
 		const snapshot = { state: context.state, pos: context.pos, allowShort: this.allowShort };
-		const request = ++this.completionRequest;
-		const result = await this.session.complete(snapshot);
+		const request  = ++this.completionRequest;
+		const result   = await this.session.complete(snapshot);
+
 		if (!result || context.aborted || request !== this.completionRequest ||
 			!this.isCurrentCompletionState(snapshot.state)) {
 			return null;
 		}
 		return {
-			from: result.from,
-			to: result.to,
-			filter: false,
+			from   : result.from,
+			to     : result.to,
+			filter : false,
 			options: result.list.map(item => ({
-				label: item.text,
+				label       : item.text,
 				displayLabel: item.displayText,
-				className: item.className,
-				detail: item.detail,
+				className   : item.className,
+				detail      : item.detail,
 			})),
 		};
 	}
@@ -417,14 +412,17 @@ export class Editor {
 		const { state } = this.view;
 		const request = ++this.argumentHintRequest;
 		const hint = await this.session.argumentHint({ state, pos: state.selection.main.head });
-		if (!hint || request !== this.argumentHintRequest || !this.isCurrentCompletionState(state)) return;
+		if (!hint || request !== this.argumentHintRequest || !this.isCurrentCompletionState(state)) {
+			return;
+		}
 		this.view.dispatch({ effects: setArgumentHint.of({
-			pos: hint.pos,
-			above: true,
+			pos   : hint.pos,
+			above : true,
 			create: () => {
 				const dom = document.createElement('div');
 				dom.className = 'cm-tern-arguments';
 				dom.append(hint.name + '(');
+
 				hint.parameters.forEach((parameter, index) => {
 					if (index) dom.append(', ');
 					const span = document.createElement(index === hint.active ? 'strong' : 'span');
@@ -454,9 +452,13 @@ export class Editor {
 				const lines = new Set();
 				transaction.changes.iterChanges((_from, _to, start, end) => {
 					const first = view.state.doc.lineAt(start).number;
-					const last = view.state.doc.lineAt(end).number;
-					for (let line = first; line < last; line++) lines.add(line);
-					if (head === last) this.changedLine = last;
+					const last  = view.state.doc.lineAt(end).number;
+					for (let line = first; line < last; line++) {
+						lines.add(line);
+					}
+					if (head === last) {
+						this.changedLine = last;
+					}
 				});
 				this.formatLines(lines);
 			} else if (this.autoFormat && transaction.isUserEvent('delete') && !view.compositionStarted) {
@@ -476,30 +478,34 @@ export class Editor {
 		if (!this.language.formatLine || !this.enabled || this.readOnly || this.composing || this.view.compositionStarted) {
 			return;
 		}
-		const { view } = this;
+		const { view }  = this;
 		const { state } = view;
-		const changes = [];
+		const changes   = [];
+
 		let formatted = state;
+
 		for (const number of lines) {
 			const line = state.doc.line(number);
 			if (!line.length) continue;
 			const result = this.language.formatLine(line.text + '\n', {
-				autoIndent: this.autoIndent,
+				autoIndent    : this.autoIndent,
 				indentWithTabs: true,
-				tabSize: TAB_SIZE,
+				tabSize       : TAB_SIZE,
 			});
 			if (!result || /[\r\n]/.test(result.text)) continue;
 			let text = result.text;
 			const analysis = state.field(commonAnalysisState, false);
 			if (result.indent && analysis?.complete && !analysis.stale) {
-				const row = formatted.doc.line(number);
+				const row       = formatted.doc.line(number);
 				const candidate = formatted.update({ changes: { from: row.from, to: row.to, insert: text } }).state;
-				const indent = getIndentation(candidate, row.from);
-				if (indent !== null) text = '\t'.repeat(Math.floor(indent / TAB_SIZE)) + ' '.repeat(indent % TAB_SIZE) + text.trimStart();
+				const indent    = getIndentation(candidate, row.from);
+				if (indent !== null) {
+					text = '\t'.repeat(Math.floor(indent / TAB_SIZE)) + ' '.repeat(indent % TAB_SIZE) + text.trimStart();
+				}
 				formatted = formatted.update({ changes: { from: row.from, to: row.to, insert: text } }).state;
 			}
 			if (text !== line.text) {
-				const start = sharedPrefix(line.text, text);
+				const start  = sharedPrefix(line.text, text);
 				const suffix = sharedSuffix(line.text, text, start);
 				changes.push({ from: line.from + start, to: line.to - suffix, insert: text.slice(start, text.length - suffix) });
 			}
@@ -508,7 +514,7 @@ export class Editor {
 		const selection = state.selection.main;
 		const changeSet = state.changes(changes);
 		view.dispatch({
-			changes: changeSet,
+			changes  : changeSet,
 			selection: collapse ? { anchor: changeSet.mapPos(selection.to) } : undefined,
 			userEvent: 'format',
 		});
@@ -516,9 +522,9 @@ export class Editor {
 
 	format() {
 		const { doc, selection } = this.view.state;
-		const { from, to } = selection.main;
+		const { from, to }       = selection.main;
 		const first = doc.lineAt(from).number;
-		const last = doc.lineAt(to > from ? to - 1 : to).number;
+		const last  = doc.lineAt(to > from ? to - 1 : to).number;
 		this.formatLines(Array.from({ length: last - first + 1 }, (_, index) => first + index), true);
 	}
 
@@ -527,12 +533,12 @@ export class Editor {
 		this.closeCompletion();
 		this.changedLine = null;
 		this.view.dispatch({
-			changes: { from: 0, to: state.doc.length, insert: Text.of(text.split(/\r\n?|\n/)) },
-			selection: { anchor: 0 },
-			annotations: Transaction.addToHistory.of(false),
-			userEvent: 'load',
+			changes       : { from: 0, to: state.doc.length, insert: Text.of(text.split(/\r\n?|\n/)) },
+			selection     : { anchor: 0 },
+			annotations   : Transaction.addToHistory.of(false),
+			userEvent     : 'load',
 			scrollIntoView: true,
-			effects: this.history.reconfigure([]),
+			effects       : this.history.reconfigure([]),
 		});
 		this.view.dispatch({ effects: this.history.reconfigure(history({ newGroupDelay: 200 })) });
 	}
@@ -557,12 +563,30 @@ export class Editor {
 		return { undo: undoDepth(this.view.state), redo: redoDepth(this.view.state) };
 	}
 
-	undo() { undo(this.view); }
-	redo() { redo(this.view); }
-	selectAll() { selectAll(this.view); }
-	toggleComment() { toggleComment(this.view); }
-	find() { openSearchPanel(this.view); }
-	findNext() { this.searchAgain(this.view, findNext); }
+	undo() {
+		undo(this.view);
+	}
+
+	redo() {
+		redo(this.view);
+	}
+
+	selectAll() {
+		selectAll(this.view);
+	}
+
+	toggleComment() {
+		toggleComment(this.view);
+	}
+
+	find() {
+		openSearchPanel(this.view);
+	}
+
+	findNext() {
+		this.searchAgain(this.view, findNext);
+	}
+
 	replace() {
 		if (!this.enabled || this.readOnly) return false;
 		openSearchPanel(this.view);
@@ -593,12 +617,16 @@ export class Editor {
 
 function sharedPrefix(before, after) {
 	let index = 0;
-	while (index < before.length && index < after.length && before[index] === after[index]) index++;
+	while (index < before.length && index < after.length && before[index] === after[index]) {
+		index++;
+	}
 	return index;
 }
 
 function sharedSuffix(before, after, prefix) {
 	let length = 0;
-	while (length < before.length - prefix && length < after.length - prefix && before.at(-length - 1) === after.at(-length - 1)) length++;
+	while (length < before.length - prefix && length < after.length - prefix && before.at(-length - 1) === after.at(-length - 1)) {
+		length++;
+	}
 	return length;
 }

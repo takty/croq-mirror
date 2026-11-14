@@ -10,7 +10,8 @@ import japanese from './res/lang.ja.json';
 // Default settings ------------------------------------------------------------
 
 const mounted = new WeakSet();
-const LANGUAGES = { en: english, ja: japanese };
+
+const LANGUAGES        = { en: english, ja: japanese };
 const DEFAULT_SETTINGS = {
 	language            : 'en',
 	codeLanguage        : 'javascript',
@@ -142,6 +143,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		root.remove();
 		mounted.delete(container);
 	}
+
 	try {
 		client = language.createAnalysisClient();
 		await client.ready;
@@ -156,6 +158,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 		}, root);
 		const cm = view.view;
 		view.setDefinitions(initialDefinitions);
+
 		const state = () => ({
 			version,
 			readOnly : settings.readOnly,
@@ -185,6 +188,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				});
 			}, settings.analysisDelay);
 		}
+
 		async function requestAnalysis() {
 			assertAlive();
 			const result = await client.request(cm.state.doc.toString(), version);
@@ -216,16 +220,19 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				})) });
 			}
 		}
+
 		for (const type of ['focus', 'blur']) {
 			cm.contentDOM.addEventListener(type, () => emit(type, {}), { signal: abort.signal });
 		}
 		for (const type of ['copy', 'cut']) {
 			cm.contentDOM.addEventListener(type, () => emit(type, { text: selectionText() }), { signal: abort.signal, capture: true });
 		}
+
 		function selectionText() {
 			const { doc, selection } = cm.state;
 			return selection.ranges.map(({ from, to }) => doc.sliceString(from, to)).join('\n');
 		}
+
 		root.addEventListener('compositionstart', () => {
 			composing = true;
 			setFormatState();
@@ -234,6 +241,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			view.composing = true;
 			cm.dom.classList.add('ime');
 		}, { signal: abort.signal });
+
 		root.addEventListener('compositionend', () => {
 			composing = false;
 			setFormatState();
@@ -241,6 +249,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			cm.dom.classList.remove('ime');
 			schedule();
 		}, { signal: abort.signal });
+
 		observer = new ResizeObserver(() => {
 			if (!destroyed) view.refresh();
 		});
@@ -257,6 +266,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				setFormatState();
 			}
 		}
+
 		// Public API ----------------------------------------------------------
 
 		const api = {
@@ -444,7 +454,9 @@ function publicAnalysis(result) {
 }
 
 function changeSource(transaction) {
-	for (const event of ['api', 'undo', 'redo']) if (transaction.isUserEvent(event)) return event;
+	for (const event of ['api', 'undo', 'redo']) {
+		if (transaction.isUserEvent(event)) return event;
+	}
 	if (transaction.isUserEvent('format')) return 'format';
 	if (transaction.isUserEvent('input.paste')) return 'paste';
 	if (transaction.isUserEvent('delete.cut')) return 'cut';

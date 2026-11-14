@@ -6,15 +6,22 @@ import { extensionStyles } from '../styles.js';
 import css from './style.css';
 
 export const setEasyLineSelectionMode = StateEffect.define();
-export const setLineSelectionMode = setEasyLineSelectionMode;
+export const setLineSelectionMode     = setEasyLineSelectionMode;
 
 const lineSelectionMode = StateField.define({
 	create: () => false,
 	update(value, transaction) {
-		if (transaction.docChanged || transaction.isUserEvent('load') ||
-			(transaction.selection && transaction.state.selection.main.empty)) value = false;
+		if (
+			transaction.docChanged ||
+			transaction.isUserEvent('load') ||
+			(transaction.selection && transaction.state.selection.main.empty)
+		) {
+			value = false;
+		}
 		for (const effect of transaction.effects) {
-			if (effect.is(setEasyLineSelectionMode)) value = !!effect.value;
+			if (effect.is(setEasyLineSelectionMode)) {
+				value = !!effect.value;
+			}
 		}
 		return value;
 	},
@@ -23,11 +30,12 @@ const lineSelectionMode = StateField.define({
 
 const gutterSelection = ViewPlugin.fromClass(class {
 	constructor(view) {
-		this.view = view;
-		this.anchor = null;
-		this.down = null;
+		this.view    = view;
+		this.anchor  = null;
+		this.down    = null;
 		this.dragged = false;
-		this.abort = new AbortController();
+		this.abort   = new AbortController();
+
 		const listen = (target, type, listener) => target.addEventListener(type, listener, { signal: this.abort.signal });
 		listen(view.dom, 'mousedown', event => this.mouseDown(event));
 		listen(view.dom, 'mousemove', event => this.mouseMove(event));
@@ -46,9 +54,10 @@ const gutterSelection = ViewPlugin.fromClass(class {
 
 	select(line) {
 		const { view, anchor } = this;
-		const { doc } = view.state;
+		const { doc }          = view.state;
+
 		const from = doc.line(Math.min(anchor, doc.lines));
-		const to = doc.line(line);
+		const to   = doc.line(line);
 		const tail = row => Math.min(doc.length, row.to + 1);
 		view.dispatch({
 			selection: anchor <= line ? EditorSelection.single(from.from, tail(to)) : EditorSelection.single(tail(from), to.from),
@@ -65,7 +74,7 @@ const gutterSelection = ViewPlugin.fromClass(class {
 	update(update) {
 		if (update.docChanged || update.transactions.some(transaction => transaction.isUserEvent('load'))) {
 			this.anchor = null;
-			this.down = null;
+			this.down   = null;
 		} else if (update.selectionSet && update.state.selection.main.empty) {
 			this.anchor = null;
 		}
@@ -106,9 +115,14 @@ const gutterSelection = ViewPlugin.fromClass(class {
 	}
 
 	mouseUp(event) {
-		if (this.down !== null && !this.dragged && !event.shiftKey &&
+		if (
+			this.down !== null &&
+			!this.dragged &&
+			!event.shiftKey &&
 			!this.view.state.field(lineSelectionMode, false) &&
-			event.target.closest?.('.cm-gutters') && this.lineAt(event) === this.down) {
+			event.target.closest?.('.cm-gutters') &&
+			this.lineAt(event) === this.down
+		) {
 			this.setMode(true);
 			this.anchor = this.down;
 		}

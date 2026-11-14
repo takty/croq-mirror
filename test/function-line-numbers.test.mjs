@@ -23,5 +23,7 @@ test('invalid starts and query lines are rejected', () => {
 		assert.throws(() => getSectionLineNumber(state.update({ effects: setSectionStarts.of(starts) }).state, 0), RangeError);
 	}
 	assert.throws(() => getSectionLineNumber(state.update({ effects: setSectionStarts.of(null) }).state, 0), TypeError);
-	for (const line of [-1, 2, 0.5]) assert.throws(() => getSectionLineNumber(state, line), RangeError);
+	for (const line of [-1, 2, 0.5]) {
+		assert.throws(() => getSectionLineNumber(state, line), RangeError);
+	}
 });

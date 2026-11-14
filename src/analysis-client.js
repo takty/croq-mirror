@@ -21,10 +21,13 @@ export class AnalysisClient {
 				const pending = this.pending.get(data.id);
 				if (!pending) return;
 				this.pending.delete(data.id);
-				if (data.error) pending.reject(new Error(data.error));
-				else pending.resolve(data.result);
+				if (data.error) {
+					pending.reject(new Error(data.error));
+				} else {
+					pending.resolve(data.result);
+				}
 			};
-			worker.onerror = event => this.fail(new Error(event.message || 'Analysis worker failed'));
+			worker.onerror        = event => this.fail(new Error(event.message || 'Analysis worker failed'));
 			worker.onmessageerror = () => this.fail(new Error('Invalid analysis worker message'));
 		});
 	}
@@ -48,7 +51,9 @@ export class AnalysisClient {
 		this.failure = error;
 		clearTimeout(this.timeout);
 		this.rejectReady(error);
-		for (const p of this.pending.values()) p.reject(error);
+		for (const p of this.pending.values()) {
+			p.reject(error);
+		}
 		this.pending.clear();
 		this.worker.terminate();
 	}

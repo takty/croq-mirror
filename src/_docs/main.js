@@ -66,13 +66,15 @@ try {
 	document.querySelector('#analysis').onclick = async () => {
 		status.textContent = JSON.stringify(await editor.analyzeNow(), null, 2);
 	};
-	for (const key of ['readonly', 'disabled']) document.querySelector('#' + key).onclick = () => {
-		const setting = key === 'readonly' ? 'readOnly' : key;
-		editor.setSettings({
-			[setting]: !editor.getSettings()[setting],
-		});
-		status.textContent = JSON.stringify(editor.getState());
-	};
+	for (const key of ['readonly', 'disabled']) {
+		document.querySelector('#' + key).onclick = () => {
+			const setting = key === 'readonly' ? 'readOnly' : key;
+			editor.setSettings({
+				[setting]: !editor.getSettings()[setting],
+			});
+			status.textContent = JSON.stringify(editor.getState());
+		};
+	}
 	document.querySelector('#recreate').onclick = async () => {
 		const value = editor.getValue();
 		editor.destroy();

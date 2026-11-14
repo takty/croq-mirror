@@ -13,8 +13,8 @@ const style = HighlightStyle.define([
 ]);
 
 const FUNCTION_SCOPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunction', 'MethodDeclaration']);
-const BLOCK_SCOPES = new Set(['Block', 'ForStatement', 'CatchClause', 'SwitchBody', 'ClassDeclaration', 'ClassExpression']);
-const DECLARATIONS = new Set(['VariableDeclaration', 'ForInSpec', 'ForOfSpec']);
+const BLOCK_SCOPES    = new Set(['Block', 'ForStatement', 'CatchClause', 'SwitchBody', 'ClassDeclaration', 'ClassExpression']);
+const DECLARATIONS    = new Set(['VariableDeclaration', 'ForInSpec', 'ForOfSpec']);
 
 export const lezerSyntax = {
 	style,
@@ -43,7 +43,9 @@ function collectInterimReferences(tree, state, add) {
 					for (let owner = parent; owner && !FUNCTION_SCOPES.has(owner.name) && !BLOCK_SCOPES.has(owner.name); owner = owner.parent) {
 						if (!DECLARATIONS.has(owner.name)) continue;
 						if (owner.getChild('var')) {
-							while (target && !target.functionScope) target = target.parent;
+							while (target && !target.functionScope) {
+								target = target.parent;
+							}
 						}
 						break;
 					}
@@ -55,7 +57,9 @@ function collectInterimReferences(tree, state, add) {
 			}
 		},
 		leave(node) {
-			if (FUNCTION_SCOPES.has(node.name) || BLOCK_SCOPES.has(node.name)) scope = scope.parent;
+			if (FUNCTION_SCOPES.has(node.name) || BLOCK_SCOPES.has(node.name)) {
+				scope = scope.parent;
+			}
 		},
 	});
 

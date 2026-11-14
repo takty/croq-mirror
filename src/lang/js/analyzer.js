@@ -85,13 +85,19 @@ function createVisitor() {
 			}
 			switch (node.kind) {
 				case 'var':
-					for (const d of node.declarations) varLocs.push([d.id, d.id]);
+					for (const d of node.declarations) {
+						varLocs.push([d.id, d.id]);
+					}
 					break;
 				case 'let':
-					for (const d of node.declarations) letLocs.push([d.id, d.id]);
+					for (const d of node.declarations) {
+						letLocs.push([d.id, d.id]);
+					}
 					break;
 				case 'const':
-					for (const d of node.declarations) constLocs.push([d.id, d.id]);
+					for (const d of node.declarations) {
+						constLocs.push([d.id, d.id]);
+					}
 					break;
 			}
 		},

@@ -25,8 +25,11 @@ class JavaScriptCompletion {
 		const files = doc === this.document ? [] : [{ type: 'full', name: 'editor.js', text: doc.toString() }];
 		this.document = doc;
 		server.request({ files, query: { file: 'editor.js', ...query } }, (error, result) => {
-			if (server !== this.server) callback(new Error('Completion session changed'));
-			else callback(error, result);
+			if (server !== this.server) {
+				callback(new Error('Completion session changed'));
+			} else {
+				callback(error, result);
+			}
 		});
 	}
 
@@ -51,7 +54,9 @@ class JavaScriptCompletion {
 
 	argumentHint({ state, pos }) {
 		let node = syntaxTree(state).resolveInner(pos, -1);
-		while (node && node.name !== 'ArgList') node = node.parent;
+		while (node && node.name !== 'ArgList') {
+			node = node.parent;
+		}
 		if (!node || node.firstChild?.name !== '(' || (node.lastChild?.name === ')' && pos >= node.lastChild.to)) {
 			return null;
 		}

@@ -77,7 +77,9 @@ var scrollMarkers = ViewPlugin2.fromClass(class {
     this.refresh();
   }
   update(update) {
-    if (update.docChanged || update.geometryChanged || update.viewportChanged || update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false)) this.refresh();
+    if (update.docChanged || update.geometryChanged || update.viewportChanged || update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false)) {
+      this.refresh();
+    }
   }
   refresh() {
     this.view.requestMeasure(this.measure);
