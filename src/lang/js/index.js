@@ -1,4 +1,3 @@
-import { closeBrackets } from '@codemirror/autocomplete';
 import { javascript, javascriptLanguage as javascriptSyntax } from '@codemirror/lang-javascript';
 import { syntaxTree } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
@@ -6,6 +5,7 @@ import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/ve
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
 import { lezerAnalysis } from '../../analysis/lezer-analysis.js';
+import { closeBracketsFor } from '../close-brackets.js';
 import { lezerSyntax } from './lezer-syntax.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
@@ -15,11 +15,10 @@ export const javascriptLanguage = {
 	supportsBracketMatching: true,
 	extensions: [
 		javascript(),
-		javascriptSyntax.data.of({ closeBrackets: { brackets: ['(', '[', "'", '"', '`'] } }),
-		closeBrackets(),
 		EditorView.editorAttributes.of({ class: 'cm-javascript' }),
 		lezerAnalysis(lezerSyntax),
 	],
+	closeBrackets: closeBracketsFor(javascriptSyntax, '`'),
 
 	createAnalysisClient() {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));

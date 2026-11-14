@@ -1,15 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EditorState } from '@codemirror/state';
+import { insertBracket } from '@codemirror/autocomplete';
 import { deleteCharBackward, insertNewlineAndIndent } from '@codemirror/commands';
 import { indentUnit } from '@codemirror/language';
-import { java } from '@codemirror/lang-java';
-import { javascript } from '@codemirror/lang-javascript';
+import { java, javaLanguage } from '@codemirror/lang-java';
+import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
+import { closeBracketsFor } from '../src/lang/close-brackets.js';
 import { lezerAnalysis, syntaxAnalysisState } from '../src/analysis/lezer-analysis.js';
 import { lezerSyntax as javaSyntax } from '../src/lang/java/lezer-syntax.js';
 import { lezerSyntax as javascriptSyntax } from '../src/lang/js/lezer-syntax.js';
 import { commonAnalysisState, createCommonAnalysis, setCommonAnalysis } from '../src/analysis/common-analysis.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
+
+test('Java and JavaScript share automatic closing with optional braces', () => {
+	for (const [support, config, extraBrackets] of [
+		[java(), javaLanguage, []],
+		[javascript(), javascriptLanguage, ['`']],
+	]) {
+		const extension = closeBracketsFor(config, ...extraBrackets);
+		const state = EditorState.create({ extensions: [support, extension(false)] });
+		for (const [open, pair] of [['(', '()'], ['[', '[]'], ["'", "''"], ['"', '""']]) {
+			const insertion = insertBracket(state, open);
+			assert.equal(insertion?.state.doc.toString(), pair);
+			assert.equal(insertion.state.selection.main.head, 1);
+		}
+		assert.equal(insertBracket(state, '{'), null);
+		assert.equal(insertBracket(state, '`')?.state.doc.toString(), extraBrackets.length ? '``' : undefined);
+		const bracesEnabled = EditorState.create({ extensions: [support, extension(true)] });
+		assert.equal(insertBracket(bracesEnabled, '{')?.state.doc.toString(), '{}');
+	}
+});
 
 test('JavaScript worker analysis reports shared UTF-16 ranges and references', () => {
 	const source = '// 😀\nconst total = 2;\nfunction add(value) { return total + value; }';

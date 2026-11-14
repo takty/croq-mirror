@@ -592,6 +592,25 @@ try {
 		]) {
 			root.scrollIntoView({ block: 'center' });
 			editor.setSettings({ analysis: false });
+			for (const [input, expected] of [['(', '()'], ['[', '[]'], ["'", "''"], ['"', '""'], ['{', '{']]) {
+				editor.loadDocument('');
+				editor.focus();
+				assert(document.execCommand('insertText', false, input), 'editor accepts delimiter input');
+				assert(editor.getValue() === expected, 'automatic delimiter insertion: ' + editor.getSettings().codeLanguage + ' ' + input);
+			}
+			for (const [closeBrackets, closeBraces, input, expected] of [
+				[true, true, '{', '{}'],
+				[false, true, '{', '{'],
+				[false, true, '(', '('],
+				[false, false, '"', '"'],
+				[true, false, '(', '()'],
+			]) {
+				editor.setSettings({ closeBrackets, closeBraces });
+				editor.loadDocument('');
+				editor.focus();
+				assert(document.execCommand('insertText', false, input) && editor.getValue() === expected,
+					'automatic closing respects runtime settings: ' + editor.getSettings().codeLanguage);
+			}
 			editor.loadDocument(source);
 			editor.moveTo({ line: 0, ch: source.indexOf('{') });
 			const lines = [...root.querySelectorAll('.cm-content .cm-line')];

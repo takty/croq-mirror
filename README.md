@@ -105,6 +105,8 @@ Use `setDefinitions` to change additional definitions after initialization.
 | `functionLineNumbers` | `false` | Per-function line numbers; ordinary line numbers when analysis is disabled |
 | `functionScrollMarkers` | `false` | Independent function-position markers near the scrollbar |
 | `bracketMatching` | `true` | CodeMirror matching-bracket highlighting and gutter indicators |
+| `closeBrackets` | `true` | Automatically close brackets and quotes in JavaScript and Java |
+| `closeBraces` | `false` | Include curly braces when `closeBrackets` is enabled |
 | `gutterLineSelection` | `true` | Select whole lines by clicking or dragging in the gutter |
 | `rulers` | `true` | Indentation guides |
 | `autoIndent` | `true` | Indentation correction during formatting |
@@ -145,6 +147,11 @@ control-flow blocks, variable declarations, local variable references, and
 per-method/lambda line numbers. Local reference detection uses lexical scopes;
 it does not resolve other classes' fields or full Java type information.
 Java diagnostics, completion, and formatting are not implemented yet.
+
+With `closeBrackets` enabled, JavaScript and Java automatically close parentheses,
+square brackets, and single and double quotes. JavaScript also closes backticks.
+Enable `closeBraces` to include curly braces in both modes. Both settings can be
+changed at runtime with `setSettings()`.
 
 Plain text retains editing, undo/redo, search, and ordinary line numbers. It does
 not create an analysis worker or completion engine. Diagnostics, formatting,
