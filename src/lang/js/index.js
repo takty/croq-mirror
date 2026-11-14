@@ -1,11 +1,12 @@
 import { javascript, javascriptLanguage as javascriptSyntax } from '@codemirror/lang-javascript';
 import { syntaxTree } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
-import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
+import { tern, beautify, defaultDefinitions } from '../../lib/vendor.js';
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
 import { lezerAnalysis } from '../../analysis/lezer-analysis.js';
 import { closeBracketsFor } from '../close-brackets.js';
+import { diagnostics } from './diagnostics.js';
 import { lezerSyntax } from './lezer-syntax.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
@@ -24,16 +25,7 @@ export const javascriptLanguage = {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
 	},
 
-	diagnostics(text, locale, options = {}) {
-		const lint = locale === 'ja' ? lintJa : lintEn;
-		lint(text, { ...defaults.jsHintOpt, indent: 1, ...options });
-		return (lint.errors || []).filter(e => e && e.line > 0).map(e => ({
-			message: e.reason,
-			severity: e.code?.startsWith('W') ? 'warning' : 'error',
-			from: { line: e.line - 1, ch: Math.max(0, e.character - 1) },
-			to: { line: e.line - 1, ch: Math.max(1, e.character) },
-		}));
-	},
+	diagnostics,
 
 	completionTrigger(key) {
 		return /\w|\./.test(key) ? { delay: 500, allowShort: key === '.' } : null;

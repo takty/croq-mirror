@@ -8,7 +8,7 @@ import {
 } from '@codemirror/commands';
 import { getIndentation, indentUnit } from '@codemirror/language';
 import { acceptCompletion, autocompletion, closeCompletion, completionStatus, startCompletion } from '@codemirror/autocomplete';
-import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
+import { forceLinting, forEachDiagnostic, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
 import { commonAnalysisState, setCommonAnalysis } from './analysis/common-analysis.js';
@@ -292,13 +292,27 @@ export class Editor {
 			]));
 		}
 		if (diagnosticsChanged) {
-			effects.push(this.options.diagnostics.reconfigure(diagnosticSource ? linter(stateView => {
-				const { doc } = stateView.state;
-				return diagnosticSource(doc.toString()).filter(item => item.from.line < doc.lines).map(item => {
+			let latestRequest = 0;
+			const extension = diagnosticSource ? linter(async stateView => {
+				const { state } = stateView;
+				const { doc } = state;
+				const phrases = state.facet(EditorState.phrases);
+				const request = ++latestRequest;
+				const items = await diagnosticSource(doc.toString());
+				const current = stateView.state;
+				// CodeMirror also rejects results for an older document.
+				if (request !== latestRequest || current.facet(EditorState.phrases) !== phrases ||
+					this.options.diagnostics.get(current) !== extension) {
+					const displayed = [];
+					forEachDiagnostic(current, (item, from, to) => displayed.push({ ...item, from, to }));
+					return displayed;
+				}
+				return items.filter(item => item.from.line < doc.lines).map(item => {
 					const from = offsetAt(doc, item.from);
 					return { from, to: Math.max(from, offsetAt(doc, item.to)), severity: item.severity, message: item.message };
 				});
-			}, { delay: 500, needsRefresh: update => update.startState.facet(EditorState.phrases) !== update.state.facet(EditorState.phrases) }) : []));
+			}, { delay: 500, needsRefresh: update => update.startState.facet(EditorState.phrases) !== update.state.facet(EditorState.phrases) }) : [];
+			effects.push(this.options.diagnostics.reconfigure(extension));
 		}
 		if (effects.length) view.dispatch({ effects });
 		if (diagnosticsChanged) {

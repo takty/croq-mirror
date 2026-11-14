@@ -29,13 +29,13 @@ export class AnalysisClient {
 		});
 	}
 
-	request(text, version) {
+	request(text, version, diagnosticLocale) {
 		if (this.failure) return Promise.reject(this.failure);
 		const id = ++this.nextId;
 		return new Promise((resolve, reject) => {
 			this.pending.set(id, { resolve, reject });
 			try {
-				this.worker.postMessage({ id, text, version });
+				this.worker.postMessage({ id, text, version, diagnosticLocale });
 			} catch (error) {
 				this.pending.delete(id);
 				reject(error);

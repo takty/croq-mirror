@@ -4,10 +4,44 @@ import { fileURLToPath } from 'node:url';
 import { Language, Parser } from 'web-tree-sitter';
 import { createCommonAnalysis } from '../src/analysis/common-analysis.js';
 import { analyzeJava } from '../src/lang/java/analyzer.js';
+import { diagnoseJava } from '../src/lang/java/diagnostics.js';
 
 await Parser.init();
 const parser = new Parser();
 parser.setLanguage(await Language.load(fileURLToPath(new URL('../node_modules/tree-sitter-java/tree-sitter-java.wasm', import.meta.url))));
+
+test('Java diagnostics report missing and unexpected syntax at UTF-16 positions', () => {
+	const source = 'void main() { String greeting = "\u{1F600}"; int n = ; int m = 1 }';
+	const tree = parser.parse(source);
+	try {
+		const diagnostics = diagnoseJava(tree.rootNode, 'en');
+		const unexpected = diagnostics.find(item => item.message === 'Unexpected syntax.');
+		assert.equal(unexpected?.severity, 'error');
+		assert.equal(unexpected.from.ch, source.indexOf('= ;'));
+		const missing = diagnostics.find(item => item.message === 'Expected ";".');
+		assert.equal(missing?.severity, 'error');
+		assert.deepEqual(missing.from, { line: 0, ch: source.indexOf('1 }') + 1 });
+		assert.deepEqual(missing.to, missing.from);
+		assert.notEqual(diagnoseJava(tree.rootNode, 'ja')[0].message, diagnostics[0].message);
+	} finally {
+		tree.delete();
+	}
+});
+
+test('Java diagnostics warn for unbraced control bodies and allow else-if chains', () => {
+	const source = 'void main() { if (ready) start(); else if (done) { stop(); } else reset();\n' +
+		'for (int i = 0; i < 1; i++) tick(); for (var x : xs) tick(x); while (ready); do tick(); while (ready); }';
+	const tree = parser.parse(source);
+	try {
+		const diagnostics = diagnoseJava(tree.rootNode, 'en');
+		const lines = source.split('\n');
+		assert.ok(diagnostics.every(item => item.severity === 'warning'));
+		assert.deepEqual(diagnostics.map(({ from, to }) => lines[from.line].slice(from.ch, to.ch)),
+			['start();', 'reset();', 'tick();', 'tick(x);', ';', 'tick();']);
+	} finally {
+		tree.delete();
+	}
+});
 
 test('Java highlights lexical variable references without confusing declarations or member names', () => {
 	const source = [

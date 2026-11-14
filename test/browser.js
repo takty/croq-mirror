@@ -536,7 +536,17 @@ try {
 			token.from === countOffset && token.to === countOffset + 'count'.length && token.kind === 'variable'),
 			'Java syntax ranges map UTF-8 parser positions to UTF-16 editor offsets');
 		assert(!javaRoot.querySelector('.cm-lint-marker') && !javaRoot.querySelector('.cm-tooltip-autocomplete'),
-			'Java initial implementation does not enable Java diagnostics or completion');
+			'Valid Java code has no diagnostics and Java does not open completion');
+		javaEditor.setSettings({ analysis: false });
+		javaEditor.loadDocument('void main() {\n if (true) IO.println(1);\n int n = 1\n}');
+		await waitFor(() => javaRoot.querySelector('.cm-lint-marker-error') &&
+			javaRoot.querySelector('.cm-lint-marker-warning'), 'Java diagnostics render independently of structure analysis');
+		assert(javaRoot.querySelector('.cm-lintRange-warning'), 'Java diagnostic underlines use the shared lint extension');
+		javaRoot.querySelector('.cm-lint-marker-error').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+		await waitFor(() => javaRoot.querySelector('.cm-tooltip-lint li'), 'Java gutter hover opens the diagnostic tooltip');
+		javaEditor.setSettings({ diagnostics: false });
+		assert(!javaRoot.querySelector('.cm-lint-marker'), 'Disabling diagnostics clears Java gutter markers');
+		javaEditor.setSettings({ analysis: true, diagnostics: true });
 		const jsStyleSource = '//note\nfunction work(arg) {\n let item = 10;\n let flag = true; let notFlag = false;\n let empty = null;\n if (item > 0) { log(arg); }\n let str = "sample";\n}';
 		const javaStyleSource = '//note\nvoid work(int arg) {\n int item = 10;\n boolean flag = true; boolean notFlag = false;\n Object empty = null;\n if (item > 0) { log(arg); }\n String str = "sample";\n}';
 		a = await createEditor(document.querySelector('#a'), { value: jsStyleSource });
@@ -797,7 +807,12 @@ try {
 		const broken = await javaEditor.analyzeNow();
 		assert(broken && !broken.success && javaRoot.querySelector('.cm-syntax-invalid') &&
 			!javaRoot.querySelector('.cm-function-number'),
-			'Java parser errors remain visible and stale method structure clears');
+			'Java retains parser error ranges and clears stale method structure');
+		await waitFor(() => javaRoot.querySelector('.cm-lintRange-error') &&
+			javaRoot.querySelector('.cm-lint-marker-error'), 'Java syntax errors use the diagnostic underline and gutter');
+		assert([...javaRoot.querySelectorAll('.cm-syntax-invalid')].every(node =>
+			getComputedStyle(node).textDecorationLine === 'none'),
+			'Java syntax highlighting does not draw a second underline');
 	} finally {
 		javaEditor?.destroy();
 	}

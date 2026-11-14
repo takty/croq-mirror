@@ -71,7 +71,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	const language = options.codeLanguage === null ? plainLanguage : options.codeLanguage === 'java' ? javaLanguage : javascriptLanguage;
 	let view, client, observer, timer, destroyed = false;
 	let settings = { ...DEFAULT_SETTINGS, ...options };
-	const diagnosticSource = text => language.diagnostics(text, settings.language);
+	const diagnosticSource = text => language.diagnostics(text, settings.language, undefined, client);
 	let version      = 0;
 	let analysis     = null;
 	let loading      = false;

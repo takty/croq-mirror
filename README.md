@@ -146,7 +146,10 @@ Java 25 simple source files, structural highlighting for methods and common
 control-flow blocks, variable declarations, local variable references, and
 per-method/lambda line numbers. Local reference detection uses lexical scopes;
 it does not resolve other classes' fields or full Java type information.
-Java diagnostics, completion, and formatting are not implemented yet.
+Java diagnostics report Tree-sitter syntax errors, missing tokens, and warnings
+for unbraced `if`, `else`, and loop bodies. They use the same lint gutter and
+tooltips as JavaScript diagnostics. Java completion and formatting are not
+implemented yet.
 
 With `closeBrackets` enabled, JavaScript and Java automatically close parentheses,
 square brackets, and single and double quotes. JavaScript also closes backticks.
@@ -202,7 +205,7 @@ It is not a list of module exports or scope-resolved public symbols.
 As in the original implementation, `forLocs` covers `ForStatement` nodes.
 
 `success` is true when normal Acorn parsing succeeds, and false when tolerant parsing with acorn-loose is used.
-This flag is independent of JSHint diagnostics. The AST is not exposed.
+This flag is independent of editor diagnostics. The AST is not exposed.
 Parsing uses script mode, as in the original implementation; ES module source parsing is outside the current scope.
 
 Immediately after editing, `getAnalysis()` returns `null`. Worker replies for older versions are not applied to the display or published as updates.

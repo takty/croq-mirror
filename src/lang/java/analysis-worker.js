@@ -1,5 +1,6 @@
 import { Language, Parser } from 'web-tree-sitter';
 import { analyzeJava } from './analyzer.js';
+import { diagnoseJava } from './diagnostics.js';
 
 let parser;
 
@@ -9,11 +10,13 @@ try {
 	});
 	parser = new Parser();
 	parser.setLanguage(await Language.load(new URL('./tree-sitter-java.wasm', import.meta.url).href));
-	self.onmessage = ({ data: { id, version, text } }) => {
+	self.onmessage = ({ data: { id, version, text, diagnosticLocale } }) => {
 		let tree;
 		try {
 			tree = parser.parse(text);
-			const result = { version, text, ...analyzeJava(text, tree.rootNode) };
+			const result = diagnosticLocale === undefined
+				? { version, text, ...analyzeJava(text, tree.rootNode) }
+				: diagnoseJava(tree.rootNode, diagnosticLocale);
 			self.postMessage({ id, result });
 		} catch (error) {
 			self.postMessage({ id, error: String(error.message || error) });

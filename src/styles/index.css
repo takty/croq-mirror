@@ -125,6 +125,7 @@
 	color: var(--croq-syntax-local-variable-color, hsl(86 60% 30%));
 }
 .croq-mirror .cm-editor.cm-javascript .cm-syntax-invalid { text-decoration: var(--croq-syntax-invalid-decoration, none); border-bottom: 0.15em solid var(--croq-mirror-l-red); }
+.croq-mirror .cm-editor.cm-java .cm-syntax-invalid { text-decoration: var(--croq-syntax-invalid-decoration, none); }
 
 .croq-mirror .cm-editor .cm-highlightSpace { background-image: none; }
 .croq-mirror .cm-editor .cm-activeLine .cm-highlightSpace {

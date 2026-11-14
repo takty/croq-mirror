@@ -48,7 +48,7 @@ and no completion or formatting result; it creates no worker.
 | `supportsBracketMatching` | Whether the language supports the shared bracket-matching display |
 | `closeBrackets(closeBraces)` | Returns the automatic closing extensions, with optional curly braces |
 | `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`. A worker snapshot includes internal `commonAnalysis`. Plain text resolves to null. |
-| `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error or warning |
+| `diagnostics(text, locale, options, client)` | Returns diagnostics synchronously or as a promise. Each item has `message`, `severity` (error or warning), and `from` and `to` as zero-based line and UTF-16 column positions. The client lets Java request diagnostics from its analysis worker independently of structural analysis. |
 | `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }` |
 | `createCompletionSession()` | Creates per-editor completion state; callbacks use UTF-16 document offsets |
 | `formatLine(text, options)` | Returns `null` or `{ text, indent }`; options contain `autoIndent`, `indentWithTabs`, and `tabSize` |

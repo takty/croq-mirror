@@ -1,4 +1,5 @@
 import { java, javaLanguage as javaSyntax } from '@codemirror/lang-java';
+import { EditorView } from '@codemirror/view';
 import { AnalysisClient } from '../../analysis-client.js';
 import { lezerAnalysis } from '../../analysis/lezer-analysis.js';
 import { closeBracketsFor } from '../close-brackets.js';
@@ -9,6 +10,7 @@ export const javaLanguage = {
 	supportsBracketMatching: true,
 	extensions: [
 		java(),
+		EditorView.editorAttributes.of({ class: 'cm-java' }),
 		lezerAnalysis(lezerSyntax),
 	],
 	closeBrackets: closeBracketsFor(javaSyntax),
@@ -17,7 +19,9 @@ export const javaLanguage = {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker-java.min.js', import.meta.url), { type: 'module' }));
 	},
 
-	diagnostics() { return []; },
+	diagnostics(text, locale, _options, client) {
+		return client.request(text, undefined, locale);
+	},
 	completionTrigger() { return null; },
 	formatLine() { return null; },
 
