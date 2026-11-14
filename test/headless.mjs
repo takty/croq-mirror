@@ -116,12 +116,34 @@ try {
 				};
 				for (let i = 0; i < 100 && !classPainted(); i++) await new Promise(resolve => setTimeout(resolve, 20));
 				assert(classPainted(), 'JavaScript sample class must be painted in translucent theme red');
+				const extensions = [
+					[['structureHighlight', 'declarationHighlight'], '.code-structure-view'],
+					[['syntaxHighlight', 'semanticHighlight'], '.cm-editor.cm-syntax-highlighting'],
+					[['functionLineNumbers'], '.cm-editor.cm-function-line-numbers'],
+					[['functionScrollMarkers'], '.cm-editor.cm-function-scroll-markers'],
+					[['bracketMatching'], '.cm-editor.cm-bracket-matching'],
+					[['gutterLineSelection'], '.cm-editor.cm-gutter-line-selection'],
+					[['rulers'], '.cm-editor.cm-indent-rulers'],
+				];
+				const toggle = name => document.getElementById('extensions').querySelector('input[name="' + name + '"]');
+				for (const [names, selector] of extensions) {
+					const controls = names.map(toggle);
+					const initial = controls.map(input => input.checked);
+					for (const input of controls) if (input.checked) input.click();
+					assert(!document.querySelector(selector), names.join(', ') + ' must turn off');
+					for (const input of controls) input.click();
+					assert(document.querySelector(selector), names.join(', ') + ' must turn on');
+					controls.forEach((input, index) => { if (input.checked !== initial[index]) input.click(); });
+				}
+				toggle('gutterLineSelection').click();
 				document.querySelector('#readonly').click();
 				assert(JSON.parse(document.querySelector('#status').textContent).readOnly, 'Read-only control must work');
 				await document.querySelector('#paste').onclick();
 				assert(document.querySelector('#status').textContent.startsWith('Paste is disabled'), 'Paste must report read-only state');
 				await document.querySelector('#recreate').onclick();
 				assert(document.querySelectorAll('.cm-editor').length === 1, 'Editor must recreate');
+				assert(!document.querySelector('.cm-editor.cm-gutter-line-selection'), 'Recreate must retain extension settings');
+				toggle('gutterLineSelection').click();
 				assert(getComputedStyle(document.querySelector('.cm-editor')).fontFamily === 'monospace', 'Default editor font must be monospace');
 				return true;
 			})()`,

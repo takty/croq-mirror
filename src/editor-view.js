@@ -124,6 +124,7 @@ export class Editor {
 			access: new Compartment(),
 			diagnostics: new Compartment(),
 			rulers: new Compartment(),
+			gutterSelection: new Compartment(),
 		};
 		this.optionState = null;
 		const customKeys = [
@@ -171,7 +172,7 @@ export class Editor {
 					cut: (_event, view) => hasNoSelection(view),
 				}),
 				this.options.rulers.of(indentRulers),
-				gutterLineSelection,
+				this.options.gutterSelection.of(gutterLineSelection),
 				highlightField,
 				argumentHintField,
 				commonAnalysisState,
@@ -247,6 +248,9 @@ export class Editor {
 		if (previous.rulers !== settings.rulers) {
 			effects.push(this.options.rulers.reconfigure(settings.rulers ? indentRulers : []));
 		}
+		if (previous.gutterLineSelection !== settings.gutterLineSelection) {
+			effects.push(this.options.gutterSelection.reconfigure(settings.gutterLineSelection ? gutterLineSelection : []));
+		}
 		if (previous.sectionNumbers !== this.sectionNumbers) {
 			effects.push(this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers));
 		}
@@ -299,6 +303,7 @@ export class Editor {
 			phrases,
 			lineWrapping: settings.lineWrapping,
 			rulers: settings.rulers,
+			gutterLineSelection: settings.gutterLineSelection,
 			sectionNumbers: this.sectionNumbers,
 			structureHighlight: settings.structureHighlight,
 			declarationHighlight: settings.declarationHighlight,

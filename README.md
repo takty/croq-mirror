@@ -105,6 +105,7 @@ Use `setDefinitions` to change additional definitions after initialization.
 | `functionLineNumbers` | `false` | Per-function line numbers; ordinary line numbers when analysis is disabled |
 | `functionScrollMarkers` | `false` | Independent function-position markers near the scrollbar |
 | `bracketMatching` | `true` | CodeMirror matching-bracket highlighting and gutter indicators |
+| `gutterLineSelection` | `true` | Select whole lines by clicking or dragging in the gutter |
 | `rulers` | `true` | Indentation guides |
 | `autoIndent` | `true` | Indentation correction during formatting |
 | `autoFormat` | `true` | Automatic formatting when editing and leaving a line |

@@ -271,9 +271,24 @@ try {
 	await a.analyzeNow();
 	a.setSettings({ functionLineNumbers: true, functionScrollMarkers: false });
 	const longWidth = gutterWidth();
+	const scrollbarStyle = document.createElement('style');
+	scrollbarStyle.textContent = '.cm-scroller::-webkit-scrollbar { width: 24px; }';
+	document.head.append(scrollbarStyle);
+	themeRoot.style.setProperty('--croq-function-scroll-marker-track-width', '10px');
 	a.setSettings({ functionLineNumbers: false, functionScrollMarkers: true });
 	await waitFor(() => editorA.querySelectorAll('.cm-function-scroll-markers > span').length > 0,
 		'function scroll markers did not render independently');
+	const scroller = editorA.querySelector('.cm-scroller');
+	const markerBounds = editorA.querySelector('.cm-function-scroll-markers > span').getBoundingClientRect();
+	const scrollerBounds = scroller.getBoundingClientRect();
+	const borderRight = parseFloat(getComputedStyle(scroller).borderRightWidth);
+	const scrollbarRight = scrollerBounds.right - borderRight;
+	const scrollbarLeft = scrollerBounds.left + scroller.clientLeft + scroller.clientWidth;
+	assert(scrollbarRight - scrollbarLeft >= 20, 'test scrollbar must be wider than the marker track');
+	assert(Math.abs((markerBounds.left + markerBounds.right - scrollbarLeft - scrollbarRight) / 2) < 1,
+		'function markers are horizontally centered in the scrollbar');
+	themeRoot.style.removeProperty('--croq-function-scroll-marker-track-width');
+	scrollbarStyle.remove();
 	a.setSettings({ functionLineNumbers: true });
 	assert(editorA.querySelectorAll('.cm-function-scroll-markers > span').length > 0,
 		'enabling function line numbers does not control function scroll markers');

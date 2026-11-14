@@ -1,7 +1,8 @@
 .cm-editor.cm-function-scroll-markers .cm-function-scroll-markers {
 	position: var(--croq-function-scroll-track-position, absolute);
-	right: var(--croq-function-scroll-track-right, 0);
-	width: var(--croq-function-scroll-marker-track-width, 10px);
+	--croq-function-scroll-track-width: var(--croq-function-scroll-marker-track-width, var(--croq-function-scrollbar-width, 10px));
+	right: var(--croq-function-scroll-track-right, calc(var(--croq-function-scrollbar-center-inset, 5px) - var(--croq-function-scroll-track-width) / 2));
+	width: var(--croq-function-scroll-track-width);
 	pointer-events: var(--croq-function-scroll-track-pointer-events, none);
 	z-index: var(--croq-function-scroll-marker-z-index, 3);
 }

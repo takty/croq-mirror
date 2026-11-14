@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
 	functionLineNumbers : false,
 	functionScrollMarkers: false,
 	bracketMatching     : true,
+	gutterLineSelection : true,
 	rulers              : true,
 	autoIndent          : true,
 	autoFormat          : true,

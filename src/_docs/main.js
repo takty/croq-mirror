@@ -5,7 +5,10 @@ const { createEditor } = await import(/* @vite-ignore */ new URL('croq-mirror.mi
 const status = document.querySelector('#status');
 const selectedLanguage = () => document.querySelector('input[name="language"]:checked').value;
 const selectedCodeLanguage = () => document.querySelector('input[name="code-language"]:checked').value;
-const functionLineNumbersEnabled = () => document.querySelector('input[name="line-numbers"]:checked').value === 'function';
+const extensionControls = document.querySelector('#extensions');
+const extensionSettings = () => Object.fromEntries(
+	Array.from(extensionControls.querySelectorAll('input[type="checkbox"]'), input => [input.name, input.checked]),
+);
 const samples = {
 	javascript: 'class Greeter {\n\tgreet(name) {\n\t\tconst message = "Hello, " + name;\n\t\tif (name) {\n\t\t\tconsole.log(message);\n\t\t}\n\t}\n}\n\nnew Greeter().greet("Croqujs");',
 	java: 'class Greeter {\n\tpublic static void main(String[] args) {\n\t\tString message = "Hello, Java";\n\t\tint count = 10;\n\t\tif (count > 0) {\n\t\t\tshowMessage(message);\n\t\t}\n\t}\n\tstatic void showMessage(String message) {\n\t\tIO.println(message);\n\t}\n}',
@@ -13,10 +16,14 @@ const samples = {
 let editor;
 let activeCodeLanguage = selectedCodeLanguage();
 try {
-	const createDemoEditor = (value, codeLanguage) => createEditor(document.querySelector('#editor'), {
-		language: selectedLanguage(), codeLanguage, value, fontSize: 18,
-		functionLineNumbers: functionLineNumbersEnabled(),
-	});
+	const createDemoEditor = async (value, codeLanguage) => {
+		const instance = await createEditor(document.querySelector('#editor'), {
+			language: selectedLanguage(), codeLanguage, value, fontSize: 18,
+			...extensionSettings(),
+		});
+		instance.setSettings(extensionSettings());
+		return instance;
+	};
 	editor = await createDemoEditor(samples[activeCodeLanguage], activeCodeLanguage);
 	document.querySelector('#language').onchange = () => editor.setSettings({ language: selectedLanguage() });
 	document.querySelector('#code-language').onchange = async () => {
@@ -35,7 +42,7 @@ try {
 			status.textContent = error.stack || error.message;
 		}
 	};
-	document.querySelector('#line-numbers').onchange = () => editor.setSettings({ functionLineNumbers: functionLineNumbersEnabled() });
+	extensionControls.onchange = () => editor?.setSettings(extensionSettings());
 	document.querySelector('#undo').onclick = () => editor.execute('undo');
 	document.querySelector('#paste').onmousedown = event => event.preventDefault();
 	document.querySelector('#paste').onclick = async () => {

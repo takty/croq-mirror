@@ -1,6 +1,7 @@
 // .build/extensions/structure-view/index.js
 import { Facet, StateEffect, StateField, countColumn } from "@codemirror/state";
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
+import { commonAnalysisState } from "croq-mirror/analysis";
 
 // .build/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
@@ -29,7 +30,14 @@ var style_default = ".cm-editor.cm-structure-view .cm-scroller {\r\n	z-index: va
 // .build/extensions/structure-view/index.js
 var setStructure = StateEffect.define();
 var retainOnEditFacet = Facet.define({ combine: (values) => values.some(Boolean) });
+var displayOptions = Facet.define({ combine: (values) => values.at(-1) ?? { structures: true, declarations: true } });
 var retainStructureOnEdit = retainOnEditFacet.of(true);
+function structureViewOptions(options) {
+  if (!options || typeof options.structures !== "boolean" || typeof options.declarations !== "boolean") {
+    throw new TypeError("Structure view options must specify structures and declarations");
+  }
+  return displayOptions.of(options);
+}
 function mapUnchangedStructure(items, transaction) {
   const oldDoc = transaction.startState.doc, newDoc = transaction.newDoc;
   const affected = [];
@@ -106,7 +114,10 @@ var structurePlugin = ViewPlugin2.fromClass(class {
     this.refresh();
   }
   update(update) {
-    if (update.docChanged || update.geometryChanged || update.viewportChanged || update.startState.field(structureField) !== update.state.field(structureField)) this.refresh();
+    const before = update.startState.field(commonAnalysisState, false);
+    const after = update.state.field(commonAnalysisState, false);
+    const options = update.state.facet(displayOptions);
+    if (update.docChanged || update.geometryChanged || update.viewportChanged || Boolean(before) !== Boolean(after) || options.structures && before?.structures !== after?.structures || options.declarations && before?.declarations !== after?.declarations || !after && update.startState.field(structureField) !== update.state.field(structureField) || update.startState.facet(displayOptions) !== options) this.refresh();
   }
   refresh() {
     this.view.requestMeasure(this.measure);
@@ -141,7 +152,10 @@ var structurePlugin = ViewPlugin2.fromClass(class {
       const columns = countColumn(doc.sliceString(block.from, offset), tabSize);
       return { x: content.left - left + linePadding + columns * view.defaultCharacterWidth, y: lineTop };
     };
-    const decorations = view.state.field(structureField).map((item) => {
+    const analysis = view.state.field(commonAnalysisState, false);
+    const options = view.state.facet(displayOptions);
+    const source = analysis ? commonDecorations(analysis, doc, options) : view.state.field(structureField);
+    const decorations = source.map((item) => {
       const start = coords(item.from);
       const end = coords(item.to, -1);
       const fill2 = resolveColor(item.fill);
@@ -168,7 +182,22 @@ var structurePlugin = ViewPlugin2.fromClass(class {
   }
   write(data) {
     Object.assign(this.overlay.style, { left: data.left + "px", top: data.top + "px", width: data.width + "px", height: data.height + "px" });
-    drawStructure(this.canvas, data);
+    const scale = this.canvas.ownerDocument.defaultView.devicePixelRatio;
+    const { width, height, charWidth, lineHeight, decorations } = data;
+    const drawing = JSON.stringify([scale, width, height, charWidth, lineHeight, decorations.map((item) => item.kind === "range" ? [
+      item.kind,
+      item.fill,
+      item.opacity,
+      item.start,
+      item.end.y,
+      item.spine,
+      item.from.line === item.to.line,
+      item.branchWidth,
+      item.branchRows
+    ] : [item.kind, item.fill, item.stroke, item.start, item.end])]);
+    if (drawing === this.lastDrawing) return;
+    drawStructure(this.canvas, data, scale);
+    this.lastDrawing = drawing;
   }
   destroy() {
     this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
@@ -181,11 +210,51 @@ var structureView = [
   EditorView2.editorAttributes.of({ class: "cm-structure-view" }),
   extensionStyles(style_default)
 ];
+function commonDecorations(analysis, doc, options) {
+  const colors = {
+    class: ["var(--croq-mirror-l-red, #e61e58)", 0.15],
+    function: ["hsla(40, 100%, 50%, 0.15)"],
+    conditional: ["hsla(150, 100%, 35%, 0.15)"],
+    loop: ["hsla(190, 90%, 50%, 0.20)"]
+  };
+  const position = (offset) => {
+    const line = doc.lineAt(offset);
+    return { line: line.number - 1, ch: offset - line.from };
+  };
+  const decorations = [];
+  if (options.structures) {
+    for (const item of analysis.structures) {
+      const [fill2, opacity] = colors[item.kind];
+      decorations.push({
+        kind: "range",
+        from: position(item.from),
+        to: position(item.to),
+        fill: fill2,
+        ...opacity === void 0 ? {} : { opacity },
+        spineChars: 3,
+        branchChars: 4,
+        branches: item.branches.map(position)
+      });
+    }
+  }
+  if (options.declarations) {
+    for (const item of analysis.declarations) {
+      const colors2 = item.scope === "function" ? ["hsla(0, 0%, 97%, 1)", "hsla(0, 0%, 69%, 0.75)"] : item.mutability === "immutable" ? ["hsla(240, 75%, 97%, 1)", "hsla(240, 75%, 65%, 0.75)"] : ["hsla(205, 100%, 97%, 1)", "hsla(205, 100%, 52%, 0.75)"];
+      decorations.push({
+        kind: "token",
+        from: position(item.from),
+        to: position(item.to),
+        fill: colors2[0],
+        stroke: colors2[1]
+      });
+    }
+  }
+  return decorations;
+}
 function refreshStructure(view) {
   view.plugin(structurePlugin)?.refresh();
 }
-function drawStructure(canvas, { width, height, charWidth, lineHeight, decorations }) {
-  const scale = canvas.ownerDocument.defaultView.devicePixelRatio;
+function drawStructure(canvas, { width, height, charWidth, lineHeight, decorations }, scale) {
   const pixelsWide = Math.round(width * scale), pixelsHigh = Math.round(height * scale);
   if (canvas.width !== pixelsWide) canvas.width = pixelsWide;
   if (canvas.height !== pixelsHigh) canvas.height = pixelsHigh;
@@ -242,5 +311,6 @@ export {
   refreshStructure,
   retainStructureOnEdit,
   setStructure,
-  structureView
+  structureView,
+  structureViewOptions
 };

@@ -6,8 +6,8 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1">
 	<title>croq-mirror - standalone example</title>
 	<link rel="stylesheet" href="./croq-mirror.min.css">
-  <script type="module" crossorigin src="./assets/index-B8zdm04Z.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BfrFQiDk.css">
+  <script type="module" crossorigin src="./assets/index-k8iru6RF.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CSppUR0J.css">
 </head>
 
 <body>
@@ -24,10 +24,17 @@
 			<label><input type="radio" name="code-language" value="javascript" checked> JavaScript</label>
 			<label><input type="radio" name="code-language" value="java"> Java</label>
 		</fieldset>
-		<fieldset id="line-numbers">
-			<legend>Line numbers</legend>
-			<label><input type="radio" name="line-numbers" value="normal"> Normal</label>
-			<label><input type="radio" name="line-numbers" value="function" checked> Per function</label>
+		<fieldset id="extensions">
+			<legend>Editor extensions</legend>
+			<label><input type="checkbox" name="structureHighlight" checked> Structure highlighting</label>
+			<label><input type="checkbox" name="declarationHighlight" checked> Declaration highlighting</label>
+			<label><input type="checkbox" name="syntaxHighlight" checked> Syntax highlighting</label>
+			<label><input type="checkbox" name="semanticHighlight" checked> Semantic highlighting</label>
+			<label><input type="checkbox" name="functionLineNumbers" checked> Per-function line numbers</label>
+			<label><input type="checkbox" name="functionScrollMarkers"> Function scroll markers</label>
+			<label><input type="checkbox" name="bracketMatching" checked> Bracket matching</label>
+			<label><input type="checkbox" name="gutterLineSelection" checked> Gutter line selection</label>
+			<label><input type="checkbox" name="rulers" checked> Indentation guides</label>
 		</fieldset>
 		<div id="editor" class="container"></div>
 		<button id="undo">Undo</button>
