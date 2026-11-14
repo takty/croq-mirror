@@ -1,7 +1,9 @@
 import { createEditor } from '../dist/croq-mirror.min.js';
 const results = [];
 const assert = (condition, message) => {
-	if (!condition) throw new Error(message);
+	if (!condition) {
+		throw new Error(message);
+	}
 	results.push(message);
 };
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -423,7 +425,11 @@ try {
 	a.destroy();
 	for (const method of ['focus', 'blur', 'hasFocus', 'getLineCount']) {
 		let rejected = false;
-		try { a[method](); } catch (error) { rejected = error.message === 'Editor destroyed'; }
+		try {
+			a[method]();
+		} catch (error) {
+			rejected = error.message === 'Editor destroyed';
+		}
 		assert(rejected, method + ' rejects after destroy');
 	}
 	assert(document.querySelector('#a').childNodes.length === 0, 'destroy is idempotent and empties container');
@@ -481,12 +487,20 @@ try {
 		a.execute('find');
 		assert(document.querySelector('#a .cm-search input'), 'plain text search remains available');
 		let rejected = false;
-		try { a.setSettings({ codeLanguage: 'javascript' }); } catch { rejected = true; }
+		try {
+			a.setSettings({ codeLanguage: 'javascript' });
+		} catch {
+			rejected = true;
+		}
 		assert(rejected && a.getSettings().codeLanguage === null, 'code language is selected at creation');
 		a.destroy();
 		for (const codeLanguage of ['python', false, 42]) {
 			let invalid = false;
-			try { await createEditor(document.querySelector('#a'), { codeLanguage }); } catch (error) { invalid = error instanceof TypeError; }
+			try {
+				await createEditor(document.querySelector('#a'), { codeLanguage });
+			} catch (error) {
+				invalid = error instanceof TypeError;
+			}
 			assert(invalid && !document.querySelector('#a').childNodes.length, 'unsupported code language rejected before mounting: ' + codeLanguage);
 		}
 	} finally {

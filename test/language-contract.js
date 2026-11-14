@@ -96,7 +96,9 @@ export async function runLanguageContractTests(assert) {
 			const canvas = host.querySelector('canvas');
 			const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 			for (let i = 0; i < pixels.length; i += 4) {
-				if (pixels[i] === red && pixels[i + 2] === blue && pixels[i + 3] >= 37 && pixels[i + 3] <= 39) return true;
+				if (pixels[i] === red && pixels[i + 2] === blue && pixels[i + 3] >= 37 && pixels[i + 3] <= 39) {
+					return true;
+				}
 			}
 			return false;
 		};
@@ -151,7 +153,9 @@ export async function runLanguageContractTests(assert) {
 		const waitForColors = async (present, absent = []) => {
 			for (let i = 0; i < 50; i++) {
 				const found = colors();
-				if (present.every(color => found.has(color)) && absent.every(color => !found.has(color))) return true;
+				if (present.every(color => found.has(color)) && absent.every(color => !found.has(color))) {
+					return true;
+				}
 				await new Promise(resolve => setTimeout(resolve, 20));
 			}
 			return false;

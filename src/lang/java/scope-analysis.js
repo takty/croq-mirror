@@ -24,8 +24,12 @@ export function isVariableReference(node) {
 	const parent = node.parent;
 	if (!parent || !REFERENCE_PARENTS.has(parent.type)) return false;
 	if (['variable_declarator', 'method_invocation', 'enhanced_for_statement', 'resource', 'instanceof_expression'].includes(parent.type) &&
-		isField(node, parent, 'name')) return false;
-	if (parent.type === 'method_reference' && parent.namedChild(0)?.startIndex !== node.startIndex) return false;
+		isField(node, parent, 'name')) {
+		return false;
+	}
+	if (parent.type === 'method_reference' && parent.namedChild(0)?.startIndex !== node.startIndex) {
+		return false;
+	}
 	return parent.type !== 'field_access' || !isField(node, parent, 'field');
 }
 

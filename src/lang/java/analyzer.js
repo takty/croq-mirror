@@ -93,7 +93,9 @@ export function analyzeJava(source, rootNode) {
 		const declarator = node.parent;
 		const declaration = declarator?.type === 'variable_declarator' ? declarator.parent : declarator;
 		if (!['local_variable_declaration', 'field_declaration', 'enhanced_for_statement', 'resource'].includes(declaration?.type) ||
-			declarator.childForFieldName('name')?.startIndex !== node.startIndex) return;
+			declarator.childForFieldName('name')?.startIndex !== node.startIndex) {
+			return;
+		}
 		const from = toOffset(node.startIndex), to = toOffset(node.endIndex);
 		if (from === undefined || to === undefined || from >= to) return;
 		const modifiers = declaration.namedChildren.find(child => child.type === 'modifiers');
@@ -189,7 +191,9 @@ export function analyzeJava(source, rootNode) {
 function isOperator(node, text) {
 	if (!OPERATORS.has(text)) return false;
 	const parent = node.parent?.type;
-	if (['type_arguments', 'type_parameters', 'wildcard', 'scoped_type_identifier', 'scoped_identifier'].includes(parent)) return false;
+	if (['type_arguments', 'type_parameters', 'wildcard', 'scoped_type_identifier', 'scoped_identifier'].includes(parent)) {
+		return false;
+	}
 	return text !== ':' || parent === 'ternary_expression';
 }
 

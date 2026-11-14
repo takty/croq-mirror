@@ -110,7 +110,9 @@ export function resolvePackageDir(name) {
 		let dir = path.dirname(req.resolve(name));
 		while (!existsSync(path.join(dir, 'package.json'))) {
 			const parent = path.dirname(dir);
-			if (parent === dir) throw new Error(`Package directory not found: ${name}`);
+			if (parent === dir) {
+				throw new Error(`Package directory not found: ${name}`);
+			}
 			dir = parent;
 		}
 		return dir;

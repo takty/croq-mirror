@@ -73,7 +73,9 @@ const gutterSelection = ViewPlugin.fromClass(class {
 
 	mouseDown(event) {
 		const { view } = this;
-		if (event.button !== 0 || !view.state.facet(EditorView.editable) || !event.target.closest('.cm-gutters')) return;
+		if (event.button !== 0 || !view.state.facet(EditorView.editable) || !event.target.closest('.cm-gutters')) {
+			return;
+		}
 		if (event.target.closest('.cm-lint-marker')) return;
 		const line = this.lineAt(event);
 		if (line === null) return;

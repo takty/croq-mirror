@@ -69,7 +69,8 @@ try {
 	for (const key of ['readonly', 'disabled']) document.querySelector('#' + key).onclick = () => {
 		const setting = key === 'readonly' ? 'readOnly' : key;
 		editor.setSettings({
-			[setting]: !editor.getSettings()[setting], });
+			[setting]: !editor.getSettings()[setting],
+		});
 		status.textContent = JSON.stringify(editor.getState());
 	};
 	document.querySelector('#recreate').onclick = async () => {
@@ -79,4 +80,6 @@ try {
 		status.textContent = 'Editor recreated.';
 	};
 	status.textContent = 'Ready. Try IME input, search, completion, and resizing.';
-} catch (error) { status.textContent = error.stack; }
+} catch (error) {
+	status.textContent = error.stack;
+}

@@ -42,7 +42,9 @@ function isReference(node) {
 	if (parent.name === 'FieldAccess' || parent.name === 'MethodReference') {
 		const identifiers = parent.getChildren('Identifier');
 		if (identifiers.length && identifiers.at(-1).from === node.from &&
-			(parent.name === 'FieldAccess' || identifiers.length > 1)) return false;
+			(parent.name === 'FieldAccess' || identifiers.length > 1)) {
+			return false;
+		}
 	}
 	return true;
 }

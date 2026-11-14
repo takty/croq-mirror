@@ -389,7 +389,9 @@ export class Editor {
 		const request = ++this.completionRequest;
 		const result = await this.session.complete(snapshot);
 		if (!result || context.aborted || request !== this.completionRequest ||
-			!this.isCurrentCompletionState(snapshot.state)) return null;
+			!this.isCurrentCompletionState(snapshot.state)) {
+			return null;
+		}
 		return {
 			from: result.from,
 			to: result.to,
@@ -409,7 +411,9 @@ export class Editor {
 	}
 
 	async updateArgumentHint() {
-		if (!this.canUseCompletion() || !this.session.argumentHint || !this.view.state.selection.main.empty) return;
+		if (!this.canUseCompletion() || !this.session.argumentHint || !this.view.state.selection.main.empty) {
+			return;
+		}
 		const { state } = this.view;
 		const request = ++this.argumentHintRequest;
 		const hint = await this.session.argumentHint({ state, pos: state.selection.main.head });
@@ -469,7 +473,9 @@ export class Editor {
 	}
 
 	formatLines(lines, collapse = false) {
-		if (!this.language.formatLine || !this.enabled || this.readOnly || this.composing || this.view.compositionStarted) return;
+		if (!this.language.formatLine || !this.enabled || this.readOnly || this.composing || this.view.compositionStarted) {
+			return;
+		}
 		const { view } = this;
 		const { state } = view;
 		const changes = [];

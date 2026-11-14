@@ -56,7 +56,9 @@ var bracketGutterOverlay = ViewPlugin2.fromClass(class {
     const left = gutterBox.right - width;
     const marks = [];
     for (const bracket of view.contentDOM.querySelectorAll(".cm-matchingBracket")) {
-      if (bracket.closest(".cm-activeLine, .cm-syntax-comment") || bracket.querySelector(".cm-syntax-comment")) continue;
+      if (bracket.closest(".cm-activeLine, .cm-syntax-comment") || bracket.querySelector(".cm-syntax-comment")) {
+        continue;
+      }
       const box = bracket.getBoundingClientRect();
       const fontSize = window.getComputedStyle(bracket).fontSize;
       if (box.left < gutterBox.right || box.left - 0.75 * parseFloat(fontSize) >= gutterBox.right) continue;

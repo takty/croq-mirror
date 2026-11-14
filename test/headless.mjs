@@ -95,10 +95,16 @@ try {
 			}
 			await new Promise(resolve => setTimeout(resolve, 100));
 		}
-		if (!ready) throw new Error('Built docs failed to initialize editors');
+		if (!ready) {
+			throw new Error('Built docs failed to initialize editors');
+		}
 		const docs = await send('Runtime.evaluate', {
 			expression: `(async () => {
-				const assert = (condition, message) => { if (!condition) throw new Error(message); };
+				const assert = (condition, message) => {
+					if (!condition) {
+						throw new Error(message);
+					}
+				};
 				assert(document.querySelectorAll('.cm-editor').length === 1, 'One editor must mount');
 				await document.querySelector('#analysis').onclick();
 				const analysis = JSON.parse(document.querySelector('#status').textContent);
@@ -151,7 +157,9 @@ try {
 			awaitPromise: true,
 			returnByValue: true,
 		}, sessionId);
-		if (docs.exceptionDetails || docs.result?.value !== true) throw new Error('Built docs check failed: ' + JSON.stringify(docs));
+		if (docs.exceptionDetails || docs.result?.value !== true) {
+			throw new Error('Built docs check failed: ' + JSON.stringify(docs));
+		}
 		console.log('Built docs passed: one editor, worker, read-only, recreate, default font, subdirectory URLs.');
 		const pastePoint = await send('Runtime.evaluate', {
 			expression: `(() => { const button = document.querySelector('#paste'); button.scrollIntoView(); const box = button.getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; })()`,
@@ -163,7 +171,9 @@ try {
 		const pasteStatus = await send('Runtime.evaluate', {
 			expression: `document.querySelector('#status').textContent`, returnByValue: true,
 		}, sessionId);
-		if (!/^(Editor text changed after Paste\.|No text change detected\.|Paste failed:)/.test(pasteStatus.result?.value)) throw new Error('Paste demo did not report its result: ' + JSON.stringify(pasteStatus.result?.value));
+		if (!/^(Editor text changed after Paste\.|No text change detected\.|Paste failed:)/.test(pasteStatus.result?.value)) {
+			throw new Error('Paste demo did not report its result: ' + JSON.stringify(pasteStatus.result?.value));
+		}
 		console.log('Built docs Paste button: ' + pasteStatus.result.value);
 		const markerPoint = await send('Runtime.evaluate', {
 			expression: `(async () => {
@@ -177,22 +187,32 @@ try {
 					marker = document.querySelector('.cm-gutter-lint .cm-lint-marker-warning');
 					if (!marker) await new Promise(resolve => setTimeout(resolve, 20));
 				}
-				if (!marker) throw new Error('The sample diagnostic must render');
+				if (!marker) {
+					throw new Error('The sample diagnostic must render');
+				}
 				const box = marker.getBoundingClientRect();
 				return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 			})()`, awaitPromise: true, returnByValue: true,
 		}, sessionId);
-		if (markerPoint.exceptionDetails) throw new Error('Sample lint marker failed: ' + JSON.stringify(markerPoint));
+		if (markerPoint.exceptionDetails) {
+			throw new Error('Sample lint marker failed: ' + JSON.stringify(markerPoint));
+		}
 		await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...markerPoint.result.value }, sessionId);
 		await new Promise(resolve => setTimeout(resolve, 450));
 		const hover = await send('Runtime.evaluate', {
 			expression: `!!document.querySelector('.cm-tooltip-lint')?.textContent.trim()`, returnByValue: true,
 		}, sessionId);
-		if (!hover.result?.value) throw new Error('Sample lint tooltip did not appear on mouse hover');
+		if (!hover.result?.value) {
+			throw new Error('Sample lint tooltip did not appear on mouse hover');
+		}
 		console.log('Built docs passed: native mouse hover opens lint tooltip in function line-number mode.');
 		const languageSwitch = await send('Runtime.evaluate', {
 			expression: `(async () => {
-				const assert = (condition, message) => { if (!condition) throw new Error(message); };
+				const assert = (condition, message) => {
+					if (!condition) {
+						throw new Error(message);
+					}
+				};
 				document.querySelector('#code-language input[value="java"]').click();
 				for (let i = 0; i < 100 && !document.querySelector('#status').textContent.includes('Switched to java'); i++)
 					await new Promise(resolve => setTimeout(resolve, 20));
@@ -238,7 +258,9 @@ try {
 			awaitPromise: true,
 			returnByValue: true,
 		}, sessionId);
-		if (languageSwitch.exceptionDetails || languageSwitch.result?.value !== true) throw new Error('Built docs language switch failed: ' + JSON.stringify(languageSwitch));
+		if (languageSwitch.exceptionDetails || languageSwitch.result?.value !== true) {
+			throw new Error('Built docs language switch failed: ' + JSON.stringify(languageSwitch));
+		}
 		console.log('Built docs passed: switch source language between JavaScript and Java.');
 		if (process.argv.includes('--screenshot')) {
 			const capture = await send('Page.captureScreenshot', { format: 'png' }, sessionId);

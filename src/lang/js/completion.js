@@ -52,7 +52,9 @@ class JavaScriptCompletion {
 	argumentHint({ state, pos }) {
 		let node = syntaxTree(state).resolveInner(pos, -1);
 		while (node && node.name !== 'ArgList') node = node.parent;
-		if (!node || node.firstChild?.name !== '(' || (node.lastChild?.name === ')' && pos >= node.lastChild.to)) return null;
+		if (!node || node.firstChild?.name !== '(' || (node.lastChild?.name === ')' && pos >= node.lastChild.to)) {
+			return null;
+		}
 		let active = 0;
 		for (let child = node.firstChild; child && child.to <= pos; child = child.nextSibling) {
 			if (child.name === ',') active++;

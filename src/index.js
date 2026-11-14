@@ -43,20 +43,36 @@ const DEFAULT_SETTINGS = {
 function validate(options) {
 	for (const [key, value] of Object.entries(options)) {
 		if (key === 'gutterLineSelection') {
-			if (typeof value !== 'boolean') throw new TypeError(`Invalid setting: ${key}`);
+			if (typeof value !== 'boolean') {
+				throw new TypeError(`Invalid setting: ${key}`);
+			}
 			continue;
 		}
-		if (!(key in DEFAULT_SETTINGS)) throw new TypeError(`Unknown setting: ${key}`);
+		if (!(key in DEFAULT_SETTINGS)) {
+			throw new TypeError(`Unknown setting: ${key}`);
+		}
 		if (key === 'codeLanguage') {
-			if (value !== null && !['javascript', 'java'].includes(value)) throw new TypeError('codeLanguage must be javascript, java, or null');
+			if (value !== null && !['javascript', 'java'].includes(value)) {
+				throw new TypeError('codeLanguage must be javascript, java, or null');
+			}
 			continue;
 		}
-		if (typeof value !== typeof DEFAULT_SETTINGS[key]) throw new TypeError(`Invalid setting: ${key}`);
-		if (typeof value === 'number' && !Number.isFinite(value)) throw new TypeError(`Invalid number: ${key}`);
+		if (typeof value !== typeof DEFAULT_SETTINGS[key]) {
+			throw new TypeError(`Invalid setting: ${key}`);
+		}
+		if (typeof value === 'number' && !Number.isFinite(value)) {
+			throw new TypeError(`Invalid number: ${key}`);
+		}
 	}
-	if (options.language !== undefined && !['ja', 'en'].includes(options.language)) throw new TypeError('language must be ja or en');
-	if (options.analysisDelay < 0 || options.lineHeight <= 0) throw new RangeError('Invalid delay or line height');
-	if (options.fontSize !== undefined && (options.fontSize < 10 || options.fontSize > 64)) throw new RangeError('fontSize must be between 10 and 64');
+	if (options.language !== undefined && !['ja', 'en'].includes(options.language)) {
+		throw new TypeError('language must be ja or en');
+	}
+	if (options.analysisDelay < 0 || options.lineHeight <= 0) {
+		throw new RangeError('Invalid delay or line height');
+	}
+	if (options.fontSize !== undefined && (options.fontSize < 10 || options.fontSize > 64)) {
+		throw new RangeError('fontSize must be between 10 and 64');
+	}
 }
 
 function normalizeSettings({ gutterLineSelection, ...options }) {
@@ -70,11 +86,17 @@ function normalizeSettings({ gutterLineSelection, ...options }) {
 
 /** Creates an editor in an empty, sized container. See README.md for the API contract. */
 export async function createEditor(container, { value = '', definitions = [], ...options } = {}) {
-	if (!container || container.nodeType !== 1 || container.ownerDocument !== document) throw new TypeError('A container in the current document is required');
-	if (mounted.has(container) || container.childNodes.length) throw new Error('Container must be empty and unoccupied');
+	if (!container || container.nodeType !== 1 || container.ownerDocument !== document) {
+		throw new TypeError('A container in the current document is required');
+	}
+	if (mounted.has(container) || container.childNodes.length) {
+		throw new Error('Container must be empty and unoccupied');
+	}
 	validate(options);
 	const initialDefinitions = structuredClone(definitions);
-	if (!Array.isArray(initialDefinitions)) throw new TypeError('definitions must be an array');
+	if (!Array.isArray(initialDefinitions)) {
+		throw new TypeError('definitions must be an array');
+	}
 	mounted.add(container);
 	const root = document.createElement('div');
 	root.className = 'croq-mirror';
@@ -93,7 +115,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	let markerId = 0;
 
 	function assertAlive() {
-		if (destroyed) throw new Error('Editor destroyed');
+		if (destroyed) {
+			throw new Error('Editor destroyed');
+		}
 	}
 
 	function emit(type, data) {
@@ -317,7 +341,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			setDefinitions(defs) {
 				assertAlive();
-				if (!Array.isArray(defs)) throw new TypeError('definitions must be an array');
+				if (!Array.isArray(defs)) {
+					throw new TypeError('definitions must be an array');
+				}
 				view.setDefinitions(structuredClone(defs));
 			},
 			getAnalysis() {
@@ -330,7 +356,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			on(type, listener) {
 				assertAlive();
-				if (typeof listener !== 'function') throw new TypeError('listener must be a function');
+				if (typeof listener !== 'function') {
+					throw new TypeError('listener must be a function');
+				}
 				if (!listeners.has(type)) listeners.set(type, new Set());
 				listeners.get(type).add(listener);
 				return () => listeners.get(type)?.delete(listener);
@@ -338,9 +366,13 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			execute(command) {
 				assertAlive();
 				const commands = ['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll', 'toggleComment', 'format', 'find', 'findNext', 'replace', 'complete'];
-				if (!commands.includes(command)) throw new TypeError(`Unknown command: ${command}`);
+				if (!commands.includes(command)) {
+					throw new TypeError(`Unknown command: ${command}`);
+				}
 				if (settings.disabled) return;
-				if (settings.readOnly && ['undo', 'redo', 'cut', 'paste', 'toggleComment', 'format', 'replace', 'complete'].includes(command)) return;
+				if (settings.readOnly && ['undo', 'redo', 'cut', 'paste', 'toggleComment', 'format', 'replace', 'complete'].includes(command)) {
+					return;
+				}
 				if (['cut', 'copy', 'paste'].includes(command)) {
 					cm.focus();
 					document.execCommand(command);
@@ -370,7 +402,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			highlightLine(line) {
 				assertAlive();
-				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) throw new RangeError('Invalid line');
+				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) {
+					throw new RangeError('Invalid line');
+				}
 				const id = ++markerId;
 				view.highlightLine(id, line);
 				return id;
@@ -381,7 +415,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			getFunctionLineNumber(line) {
 				assertAlive();
-				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) throw new RangeError('Invalid line');
+				if (!Number.isInteger(line) || line < 0 || line >= cm.state.doc.lines) {
+					throw new RangeError('Invalid line');
+				}
 				return view.getSectionLineNumber(line);
 			},
 			refresh() {

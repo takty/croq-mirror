@@ -13,7 +13,9 @@ export const sectionNumberState = StateField.define({
 		for (const effect of transaction.effects) {
 			if (!effect.is(setSectionStarts)) continue;
 			const starts = effect.value;
-			if (!Array.isArray(starts)) throw new TypeError('Section starts must be an array');
+			if (!Array.isArray(starts)) {
+				throw new TypeError('Section starts must be an array');
+			}
 			for (let index = 0; index < starts.length; index++) {
 				const line = starts[index];
 				if (!Number.isInteger(line) || line < 0 || line >= transaction.state.doc.lines ||
@@ -28,7 +30,9 @@ export const sectionNumberState = StateField.define({
 });
 
 export function getSectionLineNumber(state, line) {
-	if (!Number.isInteger(line) || line < 0 || line >= state.doc.lines) throw new RangeError('Invalid line');
+	if (!Number.isInteger(line) || line < 0 || line >= state.doc.lines) {
+		throw new RangeError('Invalid line');
+	}
 	const starts = sectionStarts(state);
 	let low = 0, high = starts.length;
 	while (low < high) {

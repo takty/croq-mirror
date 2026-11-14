@@ -17,8 +17,11 @@ export function analyze(code) {
 			base = acorn.walk.base;
 		}
 		(function c(node, st, override) {
-			var type = override || node.type, found = visitors[type];
-			if (found) { found(node, st); }
+			const type = override || node.type;
+			const found = visitors[type];
+			if (found) {
+				found(node, st);
+			}
 			base[type](node, st, c);
 		})(node, state, override);
 		return visitors;
@@ -30,7 +33,9 @@ export function analyze(code) {
 	try {
 		ast = acorn.parse(code, PARSE_OPTION);
 	} catch (error) {
-		if (!(error instanceof SyntaxError)) throw error;
+		if (!(error instanceof SyntaxError)) {
+			throw error;
+		}
 		ast = acorn.loose.parse(code, PARSE_OPTION);
 		success = false;
 	}
@@ -66,7 +71,7 @@ function createVisitor() {
 			classLocs.push([node, node]);
 		},
 		VariableDeclaration: (node, state, c) => {  // const f = function () {...};
-			for (let d of node.declarations) {
+			for (const d of node.declarations) {
 				if (d.init !== null && (d.init.type === FE || d.init.type === AFE)) {
 					if (node.loc.start.line === d.loc.start.line) {
 						fnLocs.push([node, d]);  // for considering the column of 'const'
@@ -80,13 +85,13 @@ function createVisitor() {
 			}
 			switch (node.kind) {
 				case 'var':
-					for (let d of node.declarations) varLocs.push([d.id, d.id]);
+					for (const d of node.declarations) varLocs.push([d.id, d.id]);
 					break;
 				case 'let':
-					for (let d of node.declarations) letLocs.push([d.id, d.id]);
+					for (const d of node.declarations) letLocs.push([d.id, d.id]);
 					break;
 				case 'const':
-					for (let d of node.declarations) constLocs.push([d.id, d.id]);
+					for (const d of node.declarations) constLocs.push([d.id, d.id]);
 					break;
 			}
 		},
@@ -144,6 +149,6 @@ function createVisitor() {
 			const offsets = mapRanges(node => node.start, node => node.end);
 			const result = { ...legacy, fnStarts, fnNames: fnNames.filter(Boolean), success };
 			return { ...result, commonAnalysis: buildCommonAnalysis(result, source, offsets, analyzeReferences(ast)) };
-		}
+		},
 	};
 }

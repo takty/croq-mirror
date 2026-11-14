@@ -45,7 +45,9 @@ function createCommonAnalysis(data) {
     throw new TypeError("Invalid common analysis metadata");
   }
   const structures = copyRanges(data.structures, data.sourceLength, "structure", (item) => {
-    if (!structureKinds.has(item.kind)) throw new TypeError("Invalid structure kind");
+    if (!structureKinds.has(item.kind)) {
+      throw new TypeError("Invalid structure kind");
+    }
     const branches = item.branches ?? [];
     if (!Array.isArray(branches) || branches.some((position) => !Number.isInteger(position) || position < item.from || position > item.to)) {
       throw new RangeError("Invalid structure branches");
@@ -59,7 +61,9 @@ function createCommonAnalysis(data) {
     return { kind: item.kind, mutability: item.mutability, scope: item.scope };
   });
   const syntax = copyRanges(data.syntax, data.sourceLength, "syntax", (item) => {
-    if (!syntaxKinds.has(item.kind)) throw new TypeError("Invalid syntax kind");
+    if (!syntaxKinds.has(item.kind)) {
+      throw new TypeError("Invalid syntax kind");
+    }
     return { kind: item.kind };
   });
   const references = copyRanges(data.references, data.sourceLength, "reference", (item) => {
@@ -86,7 +90,9 @@ function createCommonAnalysis(data) {
   });
 }
 function copyRanges(items, sourceLength, label, copyClassification) {
-  if (!Array.isArray(items)) throw new TypeError(`Common analysis ${label}s must be an array`);
+  if (!Array.isArray(items)) {
+    throw new TypeError(`Common analysis ${label}s must be an array`);
+  }
   return items.map((item) => {
     if (!item || !Number.isInteger(item.from) || !Number.isInteger(item.to) || item.from < 0 || item.from >= item.to || item.to > sourceLength) {
       throw new RangeError(`Invalid common analysis ${label} range`);
@@ -95,7 +101,9 @@ function copyRanges(items, sourceLength, label, copyClassification) {
   });
 }
 function copyPositions(items, sourceLength) {
-  if (!Array.isArray(items)) throw new TypeError("Common analysis sections must be an array");
+  if (!Array.isArray(items)) {
+    throw new TypeError("Common analysis sections must be an array");
+  }
   let previous = -1;
   return items.map((item) => {
     if (!item || item.kind !== "function" || !Number.isInteger(item.from) || item.from < 0 || item.from >= sourceLength || item.from < previous) {
@@ -121,7 +129,9 @@ var commonAnalysisState = StateField.define({
       if (next.sourceLength !== transaction.newDoc.length) {
         throw new RangeError("Common analysis does not match the document length");
       }
-      if (value && (next.version < value.version || value.stale && next.version <= value.version)) continue;
+      if (value && (next.version < value.version || value.stale && next.version <= value.version)) {
+        continue;
+      }
       value = value ? reuseStructureRanges(value, next) : next;
     }
     return value;
