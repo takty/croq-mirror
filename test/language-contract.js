@@ -685,6 +685,7 @@ export async function runLanguageContractTests(assert) {
 	const language = {
 		supportsFunctionSections: true,
 		extensions: [],
+		closeBrackets: () => [],
 		completionTrigger: () => null,
 		formatLine: text => ({ text: text.trimEnd().toUpperCase(), indent: false }),
 		createCompletionSession: () => ({

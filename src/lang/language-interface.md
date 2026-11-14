@@ -46,6 +46,7 @@ and no completion or formatting result; it creates no worker.
 | `extensions` | Language-specific CodeMirror syntax and synchronous interim sources; no display assembly |
 | `supportsFunctionSections` | Whether the language can provide function or method section data |
 | `supportsBracketMatching` | Whether the language supports the shared bracket-matching display |
+| `closeBrackets(closeBraces)` | Returns the automatic closing extensions, with optional curly braces |
 | `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`. A worker snapshot includes internal `commonAnalysis`. Plain text resolves to null. |
 | `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error or warning |
 | `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }` |

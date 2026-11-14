@@ -4,6 +4,7 @@ export const plainLanguage = {
 	supportsFunctionSections: false,
 	supportsBracketMatching: false,
 	extensions: [],
+	closeBrackets() { return []; },
 
 	createAnalysisClient() {
 		return {

@@ -7,7 +7,7 @@ import {
 	selectLineEnd, selectLineStart, selectLineUp, toggleComment, undo, undoDepth,
 } from '@codemirror/commands';
 import { getIndentation, indentUnit } from '@codemirror/language';
-import { acceptCompletion, autocompletion, closeBracketsKeymap, closeCompletion, completionStatus, startCompletion } from '@codemirror/autocomplete';
+import { acceptCompletion, autocompletion, closeCompletion, completionStatus, startCompletion } from '@codemirror/autocomplete';
 import { forceLinting, lintGutter, linter, setDiagnostics } from '@codemirror/lint';
 import { closeSearchPanel, findNext, findPrevious, highlightSelectionMatches, openSearchPanel, search, searchKeymap, searchPanelOpen } from '@codemirror/search';
 
@@ -121,6 +121,7 @@ export class Editor {
 			syntax: new Compartment(),
 			functionMarkers: new Compartment(),
 			brackets: new Compartment(),
+			closeBrackets: new Compartment(),
 			access: new Compartment(),
 			diagnostics: new Compartment(),
 			rulers: new Compartment(),
@@ -160,7 +161,8 @@ export class Editor {
 				EditorState.transactionFilter.of(transaction => !transaction.docChanged || allowChanges() ? transaction : []),
 				this.history.of(history({ newGroupDelay: 200 })),
 				Prec.high(keymap.of([...customKeys, ...legacyKeymap])),
-				keymap.of([...closeBracketsKeymap, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
+				this.options.closeBrackets.of([]),
+				keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap]),
 				drawSelection({ cursorBlinkRate: 530 }),
 				activeLineField,
 				highlightSelectionMatches(),
@@ -278,6 +280,10 @@ export class Editor {
 		if (previous.bracketsEnabled !== bracketsEnabled) {
 			effects.push(this.options.brackets.reconfigure(bracketsEnabled ? bracketMatchingExtension : []));
 		}
+		if (previous.closeBrackets !== settings.closeBrackets || previous.closeBraces !== settings.closeBraces) {
+			effects.push(this.options.closeBrackets.reconfigure(settings.closeBrackets
+				? this.language.closeBrackets(settings.closeBraces) : []));
+		}
 		if (previous.readOnly !== this.readOnly || previous.enabled !== this.enabled) {
 			effects.push(this.options.access.reconfigure([
 				EditorState.readOnly.of(this.readOnly || !this.enabled),
@@ -311,6 +317,8 @@ export class Editor {
 			semanticHighlight: settings.semanticHighlight,
 			functionMarkers: this.functionMarkers,
 			bracketsEnabled,
+			closeBrackets: settings.closeBrackets,
+			closeBraces: settings.closeBraces,
 			readOnly: this.readOnly,
 			enabled: this.enabled,
 			diagnosticSource,
