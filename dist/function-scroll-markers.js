@@ -1,8 +1,8 @@
-// src/extensions/function-scroll-markers/index.js
+// .build/extensions/function-scroll-markers/index.js
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
 import { commonAnalysisState } from "croq-mirror/analysis";
 
-// src/extensions/styles.js
+// .build/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
 function extensionStyles(css) {
   return ViewPlugin.fromClass(class {
@@ -23,10 +23,10 @@ function extensionStyles(css) {
   });
 }
 
-// src/extensions/function-scroll-markers/style.css
+// .build/extensions/function-scroll-markers/style.css
 var style_default = ".cm-editor.cm-function-scroll-markers .cm-function-scroll-markers {\r\n	position: var(--croq-function-scroll-track-position, absolute);\r\n	right: var(--croq-function-scroll-track-right, 0);\r\n	width: var(--croq-function-scroll-marker-track-width, 10px);\r\n	pointer-events: var(--croq-function-scroll-track-pointer-events, none);\r\n	z-index: var(--croq-function-scroll-marker-z-index, 3);\r\n}\r\n\r\n.cm-editor.cm-function-scroll-markers .cm-function-scroll-markers > span {\r\n	position: var(--croq-function-scroll-marker-position, absolute);\r\n	inset-inline: var(--croq-function-scroll-marker-inset, 2px);\r\n	aspect-ratio: var(--croq-function-scroll-marker-aspect-ratio, 1);\r\n	border-radius: var(--croq-function-scroll-marker-radius, 50%);\r\n	background: var(--croq-function-scroll-marker-color, hsl(40 100% 50% / 75%));\r\n}\r\n";
 
-// src/extensions/function-scroll-markers/index.js
+// .build/extensions/function-scroll-markers/index.js
 function sectionStarts(state) {
   const analysis = state.field(commonAnalysisState, false);
   return analysis?.sections.map((section) => state.doc.lineAt(section.from).number - 1) ?? [];

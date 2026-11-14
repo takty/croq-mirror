@@ -1,8 +1,8 @@
-// src/extensions/bracket-matching/index.js
+// .build/extensions/bracket-matching/index.js
 import { bracketMatching } from "@codemirror/language";
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
 
-// src/extensions/styles.js
+// .build/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
 function extensionStyles(css) {
   return ViewPlugin.fromClass(class {
@@ -23,10 +23,10 @@ function extensionStyles(css) {
   });
 }
 
-// src/extensions/bracket-matching/style.css
+// .build/extensions/bracket-matching/style.css
 var style_default = ".cm-editor.cm-bracket-matching :is(.cm-matchingBracket, .cm-bracket-gutter-mark) {\r\n	background: transparent;\r\n	color: inherit;\r\n	font-weight: bold;\r\n	position: relative;\r\n	isolation: isolate;\r\n}\r\n\r\n.cm-editor.cm-bracket-matching .cm-bracket-gutter-overlay {\r\n	position: absolute;\r\n	z-index: 4;\r\n	overflow: hidden;\r\n	pointer-events: none;\r\n}\r\n\r\n.cm-editor.cm-bracket-matching .cm-bracket-gutter-mark { position: absolute; }\r\n\r\n.cm-editor.cm-bracket-matching :is(.cm-matchingBracket, .cm-bracket-gutter-mark)::before {\r\n	content: '';\r\n	position: absolute;\r\n	z-index: -1;\r\n	top: -0.45em;\r\n	left: -0.75em;\r\n	right: -0.75em;\r\n	bottom: -0.45em;\r\n	border-radius: 50%;\r\n	border: 0.5em solid color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);\r\n}\r\n\r\n.cm-editor.cm-bracket-matching .cm-activeLine .cm-matchingBracket::before {\r\n	top: 0;\r\n	left: 0.05em;\r\n	right: 0.05em;\r\n	bottom: 0;\r\n	border-radius: 0.25em;\r\n	border: none;\r\n	background-color: color-mix(in srgb, var(--croq-mirror-l-yellow) 65%, transparent);\r\n}\r\n\r\n.cm-editor.cm-bracket-matching :is(\r\n	.cm-syntax-comment .cm-matchingBracket,\r\n	.cm-matchingBracket.cm-syntax-comment,\r\n	.cm-matchingBracket:has(.cm-syntax-comment)\r\n)::before {\r\n	content: none;\r\n}\r\n";
 
-// src/extensions/bracket-matching/index.js
+// .build/extensions/bracket-matching/index.js
 var bracketGutterOverlay = ViewPlugin2.fromClass(class {
   constructor(view) {
     this.view = view;

@@ -1,9 +1,9 @@
-// src/extensions/structure-view/index.js
+// .build/extensions/structure-view/index.js
 import { Facet, StateEffect, StateField, countColumn } from "@codemirror/state";
 import { EditorView as EditorView2, ViewPlugin as ViewPlugin2 } from "@codemirror/view";
 import { commonAnalysisState } from "croq-mirror/analysis";
 
-// src/extensions/styles.js
+// .build/extensions/styles.js
 import { EditorView, ViewPlugin } from "@codemirror/view";
 function extensionStyles(css) {
   return ViewPlugin.fromClass(class {
@@ -24,10 +24,10 @@ function extensionStyles(css) {
   });
 }
 
-// src/extensions/structure-view/style.css
+// .build/extensions/structure-view/style.css
 var style_default = ".cm-editor.cm-structure-view .cm-scroller {\r\n	z-index: var(--croq-structure-scroller-z-index, auto);\r\n}\r\n\r\n.cm-editor.cm-structure-view .cm-content {\r\n	z-index: var(--croq-structure-content-z-index, 1);\r\n}\r\n\r\n.cm-editor.cm-structure-view .cm-structure-overlay {\r\n	position: var(--croq-structure-overlay-position, absolute);\r\n	z-index: var(--croq-structure-overlay-z-index, 0);\r\n	overflow: var(--croq-structure-overlay-overflow, hidden);\r\n	pointer-events: var(--croq-structure-overlay-pointer-events, none);\r\n}\r\n\r\n.cm-editor.cm-structure-view .code-structure-view {\r\n	display: var(--croq-structure-canvas-display, block);\r\n	width: var(--croq-structure-canvas-width, 100%);\r\n	height: var(--croq-structure-canvas-height, 100%);\r\n}\r\n";
 
-// src/extensions/structure-view/index.js
+// .build/extensions/structure-view/index.js
 var setStructure = StateEffect.define();
 var retainOnEditFacet = Facet.define({ combine: (values) => values.some(Boolean) });
 var displayOptions = Facet.define({ combine: (values) => values.at(-1) ?? { structures: true, declarations: true } });
