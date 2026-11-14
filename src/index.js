@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS = {
 	bracketMatching     : true,
 	closeBrackets       : true,
 	closeBraces         : false,
-	gutterLineSelection : true,
+	easyLineSelection   : false,
 	rulers              : true,
 	autoIndent          : true,
 	autoFormat          : true,
@@ -42,6 +42,10 @@ const DEFAULT_SETTINGS = {
 
 function validate(options) {
 	for (const [key, value] of Object.entries(options)) {
+		if (key === 'gutterLineSelection') {
+			if (typeof value !== 'boolean') throw new TypeError(`Invalid setting: ${key}`);
+			continue;
+		}
 		if (!(key in DEFAULT_SETTINGS)) throw new TypeError(`Unknown setting: ${key}`);
 		if (key === 'codeLanguage') {
 			if (value !== null && !['javascript', 'java'].includes(value)) throw new TypeError('codeLanguage must be javascript, java, or null');
@@ -53,6 +57,13 @@ function validate(options) {
 	if (options.language !== undefined && !['ja', 'en'].includes(options.language)) throw new TypeError('language must be ja or en');
 	if (options.analysisDelay < 0 || options.lineHeight <= 0) throw new RangeError('Invalid delay or line height');
 	if (options.fontSize !== undefined && (options.fontSize < 10 || options.fontSize > 64)) throw new RangeError('fontSize must be between 10 and 64');
+}
+
+function normalizeSettings({ gutterLineSelection, ...options }) {
+	if (gutterLineSelection !== undefined && !Object.hasOwn(options, 'easyLineSelection')) {
+		options.easyLineSelection = gutterLineSelection;
+	}
+	return options;
 }
 
 // Editor lifecycle ------------------------------------------------------------
@@ -70,7 +81,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 	container.append(root);
 	const language = options.codeLanguage === null ? plainLanguage : options.codeLanguage === 'java' ? javaLanguage : javascriptLanguage;
 	let view, client, observer, timer, destroyed = false;
-	let settings = { ...DEFAULT_SETTINGS, ...options };
+	let settings = { ...DEFAULT_SETTINGS, ...normalizeSettings(options) };
 	const diagnosticSource = text => language.diagnostics(text, settings.language, undefined, client);
 	let version      = 0;
 	let analysis     = null;
@@ -260,9 +271,12 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				assertAlive();
 				return selectionText();
 			},
-			setLineSelectionMode(enabled) {
+			setEasyLineSelectionMode(enabled) {
 				assertAlive();
-				view.setLineSelectionMode(enabled);
+				view.setEasyLineSelectionMode(enabled);
+			},
+			setLineSelectionMode(enabled) {
+				api.setEasyLineSelectionMode(enabled);
 			},
 			replaceSelection(text) {
 				edit(() => {
@@ -280,7 +294,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			},
 			getSettings() {
 				assertAlive();
-				return { ...settings };
+				return { ...settings, gutterLineSelection: settings.easyLineSelection };
 			},
 			setSettings(patch) {
 				assertAlive();
@@ -290,7 +304,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				}
 				const wasAnalyzing = settings.analysis;
 				const delayChanged = Object.hasOwn(patch, 'analysisDelay') && patch.analysisDelay !== settings.analysisDelay;
-				settings = { ...settings, ...patch };
+				settings = { ...settings, ...normalizeSettings(patch) };
 				if (!settings.analysis) {
 					clearTimeout(timer);
 					analysis = null;
@@ -298,7 +312,7 @@ export async function createEditor(container, { value = '', definitions = [], ..
 				}
 				applySettings();
 				if (settings.analysis && (!wasAnalyzing || delayChanged)) schedule();
-				emit('settings', settings);
+				emit('settings', api.getSettings());
 				emit('state', state());
 			},
 			setDefinitions(defs) {

@@ -10,10 +10,13 @@ import { retainStructureOnEdit, setStructure, structureView } from '../dist/stru
 import { functionLineNumbers, getSectionLineNumber, setSectionStarts } from '../dist/function-line-numbers.js';
 import { functionScrollMarkers } from '../dist/function-scroll-markers.js';
 import { gutterLineSelection, setLineSelectionMode } from '../dist/gutter-line-selection.js';
+import { easyLineSelection, setEasyLineSelectionMode, standardGutterLineSelection } from '../dist/easy-line-selection.js';
 import { indentRulers } from '../dist/indent-rulers.js';
 import { setSyntaxHighlights, syntaxHighlightingExtension, syntaxHighlightingOptions, syntaxHighlightingSource } from '../dist/syntax-highlighting.js';
 
 export async function runLanguageContractTests(assert) {
+	assert(gutterLineSelection === easyLineSelection && setLineSelectionMode === setEasyLineSelectionMode,
+		'legacy gutter exports share the new extension and state effect');
 	const ja = javascriptLanguage.diagnostics('var x = 1', 'ja', { esversion: 10, varstmt: true });
 	const en = javascriptLanguage.diagnostics('var x = 1', 'en', { esversion: 10, varstmt: true });
 	assert(ja.length && en.length && ja[0].message !== en[0].message, 'simultaneous localized diagnostics');
@@ -395,8 +398,12 @@ export async function runLanguageContractTests(assert) {
 			'standalone gutter click selects a line and uses the customized selection cursor');
 		lineClick(3);
 		assert(selectionText() === 'two\nthree\nlast' && mode(), 'line mode extends selection from the previous anchor');
+		lineClick(2);
+		assert(selectionText() === 'two\nthree\n' && mode(), 'a third click moves only the end of the selection');
+		lineClick(0);
+		assert(selectionText() === 'one\ntwo\n' && mode(), 'clicking above the anchor keeps the original starting line');
 		lineClick(0, { shiftKey: true });
-		assert(selectionText() === 'one\ntwo\nthree\nlast' && !mode(), 'shift-click selects whole lines in reverse and exits line mode');
+		assert(selectionText() === 'one\ntwo\n' && !mode(), 'shift-click selects from the original anchor and exits line mode');
 		lineMouse('mousedown', 2);
 		lineMouse('mousemove', 0);
 		lineMouse('mouseup', 0);
@@ -428,6 +435,20 @@ export async function runLanguageContractTests(assert) {
 		selectionView.dispatch({ effects: setSectionStarts.of([0, 2]) });
 		lineClick(1);
 		assert(selectionText() === 'two\n' && mode(), 'gutter selection works with function line numbers');
+		selectionView.dispatch({ effects: selectionCompartment.reconfigure(standardGutterLineSelection) });
+		for (const numbers of [functionLineNumbers, lineNumbers()]) {
+			selectionView.dispatch({ effects: gutterCompartment.reconfigure(numbers) });
+			lineClick(1);
+			lineClick(3);
+			assert(selectionText() === 'last' && !mode(), 'standard consecutive clicks select only the latest line');
+			lineClick(1, { shiftKey: true });
+			assert(selectionText() === 'two\nthree\nlast' && !mode(), 'standard Shift-click extends selection');
+			lineMouse('mousedown', 2);
+			lineMouse('mousemove', 0);
+			lineMouse('mouseup', 0);
+			assert(selectionText() === 'one\ntwo\nthree\n' && !mode(), 'standard dragging selects whole lines');
+		}
+		selectionView.dispatch({ effects: gutterCompartment.reconfigure(functionLineNumbers) });
 		selectionView.dispatch({ effects: selectionCompartment.reconfigure([]) });
 		assert(!mode() && !getComputedStyle(selectionHost.querySelector('.cm-sectionNumbers')).cursor.includes('data:image/svg+xml'),
 			'removing the extension removes its line-selection mode and cursor');

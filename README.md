@@ -54,7 +54,7 @@ Initialization failures reject the promise and clean up resources and DOM elemen
 | `replaceDocument(text)` | Replaces the entire document as an undoable edit |
 | `replaceRange(text, from, to = from)` | Replaces a range as an undoable edit |
 | `getSelection()` / `replaceSelection(text)` | Gets selected text or replaces it as an undoable edit |
-| `setLineSelectionMode(enabled)` | Toggles line selection mode; the host can clear it before menu actions |
+| `setEasyLineSelectionMode(enabled)` | Sets the active easy selection mode when the feature is enabled; pass `false` to exit before menu actions |
 | `getSettings()` / `setSettings(patch)` | Gets settings or applies a partial update |
 | `getState()` | Returns `version`, `readOnly`, `disabled`, `canUndo`, and `canRedo` |
 | `execute(command)` | Executes one of the commands listed below |
@@ -107,7 +107,7 @@ Use `setDefinitions` to change additional definitions after initialization.
 | `bracketMatching` | `true` | CodeMirror matching-bracket highlighting and gutter indicators |
 | `closeBrackets` | `true` | Automatically close brackets and quotes in JavaScript and Java |
 | `closeBraces` | `false` | Include curly braces when `closeBrackets` is enabled |
-| `gutterLineSelection` | `true` | Select whole lines by clicking or dragging in the gutter |
+| `easyLineSelection` | `false` | Extend whole-line selection with consecutive gutter clicks |
 | `rulers` | `true` | Indentation guides |
 | `autoIndent` | `true` | Indentation correction during formatting |
 | `autoFormat` | `true` | Automatic formatting when editing and leaving a line |
@@ -294,25 +294,33 @@ import { functionScrollMarkers } from 'croq-mirror/function-scroll-markers';
 // with setCommonAnalysis.of(data) when the document's current analysis arrives.
 ```
 
-### Gutter line-selection extension
+### Easy line-selection extension
 
-`croq-mirror/gutter-line-selection` provides a standalone extension for
-clicking, shift-clicking, and dragging in the gutter to select whole lines.
-Install a gutter separately, for example CodeMirror's `lineNumbers()` or the
-function line-number extension. The host can clear line-selection mode before
-an action by dispatching `setLineSelectionMode.of(false)`.
+The component always supports whole-line selection by clicking, Shift-clicking,
+or dragging in the gutter. Enable `easyLineSelection` to select a range with
+two ordinary clicks. The first click sets the anchor, and later clicks extend
+the selection from that line.
+
+Standalone editors can use `croq-mirror/easy-line-selection` with a line-number
+gutter. It exports `easyLineSelection` and `standardGutterLineSelection` for
+editors that only need the standard gestures.
 
 ```js
 import { lineNumbers } from '@codemirror/view';
-import { gutterLineSelection, setLineSelectionMode } from 'croq-mirror/gutter-line-selection';
+import { easyLineSelection, setEasyLineSelectionMode } from 'croq-mirror/easy-line-selection';
 
-// Include lineNumbers() and gutterLineSelection in the editor's extensions.
-view.dispatch({ effects: setLineSelectionMode.of(false) });
+// Include lineNumbers() and easyLineSelection in the editor's extensions.
+view.dispatch({ effects: setEasyLineSelectionMode.of(false) });
 ```
 
 The extension ignores lint markers and allows selection in read-only editors.
 Setting `EditorView.editable` to false disables gutter interaction. Removing
 the extension removes its event listeners and cursor styling.
+
+The legacy `gutterLineSelection` setting remains an alias for
+`easyLineSelection`. If both are supplied in a settings update, the new name
+takes precedence. The old `setLineSelectionMode()` method, extension exports,
+and `croq-mirror/gutter-line-selection` import continue to work.
 
 ### Syntax highlighting extension
 
@@ -437,7 +445,7 @@ The distribution contains:
 - `analysis-worker.min.js`: the analysis worker and its parser dependencies
 - `analysis-worker-java.min.js`, `web-tree-sitter.wasm`, `tree-sitter-java.wasm`: the Java parser worker and WebAssembly runtimes
 - `croq-mirror.min.css`: the combined, scoped editor styles
-- `analysis.js`, `structure-view.js`, `syntax-highlighting.js`, `function-line-numbers.js`, `function-scroll-markers.js`, `bracket-matching.js`, `gutter-line-selection.js`, `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
+- `analysis.js`, `structure-view.js`, `syntax-highlighting.js`, `function-line-numbers.js`, `function-scroll-markers.js`, `bracket-matching.js`, `easy-line-selection.js`, `gutter-line-selection.js` (compatibility entry), `indent-rulers.js`: standalone extensions with external CodeMirror dependencies
 - JavaScript source maps for debugging; these are not required at runtime
 - `licenses/`: third-party licenses
 

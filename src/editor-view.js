@@ -15,7 +15,7 @@ import { commonAnalysisState, setCommonAnalysis } from './analysis/common-analys
 import { bracketMatchingExtension } from './extensions/bracket-matching/index.js';
 import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber } from './extensions/function-line-numbers/index.js';
 import { functionScrollMarkers, refreshFunctionScrollMarkers } from './extensions/function-scroll-markers/index.js';
-import { gutterLineSelection, setLineSelectionMode } from './extensions/gutter-line-selection/index.js';
+import { easyLineSelection, setEasyLineSelectionMode, standardGutterLineSelection } from './extensions/gutter-line-selection/index.js';
 import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
 import { syntaxHighlightingExtension, syntaxHighlightingOptions } from './extensions/syntax-highlighting/index.js';
 import { refreshStructure, structureView, structureViewOptions } from './extensions/structure-view/index.js';
@@ -174,7 +174,8 @@ export class Editor {
 					cut: (_event, view) => hasNoSelection(view),
 				}),
 				this.options.rulers.of(indentRulers),
-				this.options.gutterSelection.of(gutterLineSelection),
+				standardGutterLineSelection,
+				this.options.gutterSelection.of([]),
 				highlightField,
 				argumentHintField,
 				commonAnalysisState,
@@ -221,8 +222,8 @@ export class Editor {
 		target.addEventListener(type, handler, { ...options, signal: this.abort.signal });
 	}
 
-	setLineSelectionMode(enabled) {
-		this.view.dispatch({ effects: setLineSelectionMode.of(enabled) });
+	setEasyLineSelectionMode(enabled) {
+		this.view.dispatch({ effects: setEasyLineSelectionMode.of(enabled) });
 	}
 
 	setOptions(settings, phrases, diagnosticSource) {
@@ -250,8 +251,8 @@ export class Editor {
 		if (previous.rulers !== settings.rulers) {
 			effects.push(this.options.rulers.reconfigure(settings.rulers ? indentRulers : []));
 		}
-		if (previous.gutterLineSelection !== settings.gutterLineSelection) {
-			effects.push(this.options.gutterSelection.reconfigure(settings.gutterLineSelection ? gutterLineSelection : []));
+		if (previous.easyLineSelection !== settings.easyLineSelection) {
+			effects.push(this.options.gutterSelection.reconfigure(settings.easyLineSelection ? easyLineSelection : []));
 		}
 		if (previous.sectionNumbers !== this.sectionNumbers) {
 			effects.push(this.options.numbers.reconfigure(this.sectionNumbers ? functionLineNumbers : absoluteLineNumbers));
@@ -323,7 +324,7 @@ export class Editor {
 			phrases,
 			lineWrapping: settings.lineWrapping,
 			rulers: settings.rulers,
-			gutterLineSelection: settings.gutterLineSelection,
+			easyLineSelection: settings.easyLineSelection,
 			sectionNumbers: this.sectionNumbers,
 			structureHighlight: settings.structureHighlight,
 			declarationHighlight: settings.declarationHighlight,

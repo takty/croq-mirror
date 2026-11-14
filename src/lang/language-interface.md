@@ -32,7 +32,7 @@ change at runtime.
 - `bracket-matching` combines CodeMirror's standard bracket matching with the
   component's gutter indicators. It does not scan the whole document for
   unmatched brackets.
-- `gutterLineSelection` and `indentRulers` handle their own display behavior.
+- Gutter selection and `indentRulers` handle their own display behavior.
 
 The view never lets a language replace document text. It applies formatting
 results through its own editing guards. Every language supplies the same

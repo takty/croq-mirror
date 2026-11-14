@@ -13,6 +13,7 @@
 		"./function-scroll-markers": "./dist/function-scroll-markers.js",
 		"./bracket-matching": "./dist/bracket-matching.js",
 		"./gutter-line-selection": "./dist/gutter-line-selection.js",
+		"./easy-line-selection": "./dist/easy-line-selection.js",
 		"./indent-rulers": "./dist/indent-rulers.js",
 		"./syntax-highlighting": "./dist/syntax-highlighting.js"
 	},

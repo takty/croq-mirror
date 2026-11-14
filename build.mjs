@@ -73,7 +73,7 @@ async function buildJavaScript() {
 			'function-line-numbers': join(stageRoot, 'extensions', 'function-line-numbers', 'index.js'),
 			'function-scroll-markers': join(stageRoot, 'extensions', 'function-scroll-markers', 'index.js'),
 			'bracket-matching': join(stageRoot, 'extensions', 'bracket-matching', 'index.js'),
-			'gutter-line-selection': join(stageRoot, 'extensions', 'gutter-line-selection', 'index.js'),
+			'easy-line-selection': join(stageRoot, 'extensions', 'gutter-line-selection', 'index.js'),
 			'indent-rulers': join(stageRoot, 'extensions', 'indent-rulers', 'index.js'),
 			'syntax-highlighting': join(stageRoot, 'extensions', 'syntax-highlighting', 'index.js'),
 		},
@@ -93,6 +93,7 @@ async function buildJavaScript() {
 		target: 'es2022',
 		legalComments: 'inline',
 	});
+	await writeFileIfChanged(join(out, 'gutter-line-selection.js'), "export * from './easy-line-selection.js';\n");
 	await copyFileIfChanged(join(resolvePackageDir('web-tree-sitter'), 'web-tree-sitter.wasm'), join(out, 'web-tree-sitter.wasm'));
 	await copyFileIfChanged(join(resolvePackageDir('tree-sitter-java'), 'tree-sitter-java.wasm'), join(out, 'tree-sitter-java.wasm'));
 }

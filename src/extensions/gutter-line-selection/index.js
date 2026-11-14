@@ -5,15 +5,16 @@ import cursorLine from './cursor-line.svg';
 import { extensionStyles } from '../styles.js';
 import css from './style.css';
 
-export const setLineSelectionMode = StateEffect.define();
+export const setEasyLineSelectionMode = StateEffect.define();
+export const setLineSelectionMode = setEasyLineSelectionMode;
 
 const lineSelectionMode = StateField.define({
 	create: () => false,
 	update(value, transaction) {
-		if ((transaction.docChanged || transaction.selection || transaction.isUserEvent('load')) &&
-			transaction.state.selection.main.empty) value = false;
+		if (transaction.docChanged || transaction.isUserEvent('load') ||
+			(transaction.selection && transaction.state.selection.main.empty)) value = false;
 		for (const effect of transaction.effects) {
-			if (effect.is(setLineSelectionMode)) value = !!effect.value;
+			if (effect.is(setEasyLineSelectionMode)) value = !!effect.value;
 		}
 		return value;
 	},
@@ -25,6 +26,7 @@ const gutterSelection = ViewPlugin.fromClass(class {
 		this.view = view;
 		this.anchor = null;
 		this.down = null;
+		this.dragged = false;
 		this.abort = new AbortController();
 		const listen = (target, type, listener) => target.addEventListener(type, listener, { signal: this.abort.signal });
 		listen(view.dom, 'mousedown', event => this.mouseDown(event));
@@ -55,7 +57,18 @@ const gutterSelection = ViewPlugin.fromClass(class {
 	}
 
 	setMode(enabled) {
-		this.view.dispatch({ effects: setLineSelectionMode.of(enabled) });
+		if (this.view.state.field(lineSelectionMode, false) !== undefined) {
+			this.view.dispatch({ effects: setEasyLineSelectionMode.of(enabled) });
+		}
+	}
+
+	update(update) {
+		if (update.docChanged || update.transactions.some(transaction => transaction.isUserEvent('load'))) {
+			this.anchor = null;
+			this.down = null;
+		} else if (update.selectionSet && update.state.selection.main.empty) {
+			this.anchor = null;
+		}
 	}
 
 	mouseDown(event) {
@@ -66,10 +79,11 @@ const gutterSelection = ViewPlugin.fromClass(class {
 		if (line === null) return;
 		event.preventDefault();
 		this.down = line;
+		this.dragged = false;
 		if (event.shiftKey) {
 			this.anchor ??= view.state.doc.lineAt(view.state.selection.main.head).number;
 			this.setMode(false);
-		} else if (!view.state.field(lineSelectionMode) || this.anchor === null) {
+		} else if (!view.state.field(lineSelectionMode, false) || this.anchor === null) {
 			this.anchor = line;
 		}
 		this.select(line);
@@ -79,11 +93,20 @@ const gutterSelection = ViewPlugin.fromClass(class {
 	mouseMove(event) {
 		if (this.down === null || event.buttons !== 1) return;
 		const line = this.lineAt(event);
-		if (line !== null) this.select(line);
+		if (line !== null) {
+			if (!this.dragged && line !== this.down) {
+				this.dragged = true;
+				if (!event.shiftKey) this.anchor = this.down;
+				this.setMode(false);
+			}
+			this.select(line);
+		}
 	}
 
 	mouseUp(event) {
-		if (this.down !== null && !event.shiftKey && event.target.closest?.('.cm-gutters') && this.lineAt(event) === this.down) {
+		if (this.down !== null && !this.dragged && !event.shiftKey &&
+			!this.view.state.field(lineSelectionMode, false) &&
+			event.target.closest?.('.cm-gutters') && this.lineAt(event) === this.down) {
 			this.setMode(true);
 			this.anchor = this.down;
 		}
@@ -95,11 +118,18 @@ const gutterSelection = ViewPlugin.fromClass(class {
 	}
 });
 
-export const gutterLineSelection = [
-	lineSelectionMode,
+export const standardGutterLineSelection = [
 	gutterSelection,
 	EditorView.editorAttributes.of({ class: 'cm-gutter-line-selection' }),
 	extensionStyles(css
 		.replace('./cursor-right.svg', `data:image/svg+xml;base64,${cursorRight}`)
 		.replace('./cursor-line.svg', `data:image/svg+xml;base64,${cursorLine}`)),
 ];
+
+export const easyLineSelection = [
+	standardGutterLineSelection,
+	lineSelectionMode,
+	EditorView.editorAttributes.of({ class: 'cm-easy-line-selection' }),
+];
+
+export const gutterLineSelection = easyLineSelection;

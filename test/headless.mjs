@@ -122,7 +122,7 @@ try {
 					[['functionLineNumbers'], '.cm-editor.cm-function-line-numbers'],
 					[['functionScrollMarkers'], '.cm-editor.cm-function-scroll-markers'],
 					[['bracketMatching'], '.cm-editor.cm-bracket-matching'],
-					[['gutterLineSelection'], '.cm-editor.cm-gutter-line-selection'],
+					[['easyLineSelection'], '.cm-editor.cm-easy-line-selection'],
 					[['rulers'], '.cm-editor.cm-indent-rulers'],
 				];
 				const toggle = name => document.getElementById('extensions').querySelector('input[name="' + name + '"]');
@@ -135,15 +135,16 @@ try {
 					assert(document.querySelector(selector), names.join(', ') + ' must turn on');
 					controls.forEach((input, index) => { if (input.checked !== initial[index]) input.click(); });
 				}
-				toggle('gutterLineSelection').click();
+				toggle('easyLineSelection').click();
 				document.querySelector('#readonly').click();
 				assert(JSON.parse(document.querySelector('#status').textContent).readOnly, 'Read-only control must work');
 				await document.querySelector('#paste').onclick();
 				assert(document.querySelector('#status').textContent.startsWith('Paste is disabled'), 'Paste must report read-only state');
 				await document.querySelector('#recreate').onclick();
 				assert(document.querySelectorAll('.cm-editor').length === 1, 'Editor must recreate');
-				assert(!document.querySelector('.cm-editor.cm-gutter-line-selection'), 'Recreate must retain extension settings');
-				toggle('gutterLineSelection').click();
+				assert(document.querySelector('.cm-editor.cm-easy-line-selection'), 'Recreate must retain extension settings');
+				toggle('easyLineSelection').click();
+				assert(document.querySelector('.cm-editor.cm-gutter-line-selection'), 'Standard gutter selection remains enabled');
 				assert(getComputedStyle(document.querySelector('.cm-editor')).fontFamily === 'monospace', 'Default editor font must be monospace');
 				return true;
 			})()`,
