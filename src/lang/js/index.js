@@ -5,9 +5,8 @@ import { EditorView } from '@codemirror/view';
 import { tern, lintEn, lintJa, beautify, defaultDefinitions } from '../../lib/vendor.js';
 import defaults from '../../res/defaults.json';
 import { AnalysisClient } from '../../analysis-client.js';
-import { syntaxHighlightingSource } from '../../extensions/syntax-highlighting/index.js';
-import { adaptJavaScriptAnalysis } from './analysis-adapter.js';
-import { analyzeSyntax } from './syntax-analysis.js';
+import { lezerAnalysis } from '../../analysis/lezer-analysis.js';
+import { lezerSyntax } from './lezer-syntax.js';
 
 // Internal language contract: see ../language-interface.md. No Editor private state
 // crosses this boundary; the view applies returned data to its own document/UI.
@@ -19,15 +18,11 @@ export const javascriptLanguage = {
 		javascriptSyntax.data.of({ closeBrackets: { brackets: ['(', '[', "'", '"', '`'] } }),
 		closeBrackets(),
 		EditorView.editorAttributes.of({ class: 'cm-javascript' }),
-		syntaxHighlightingSource(analyzeSyntax, update => syntaxTree(update.startState) !== syntaxTree(update.state)),
+		lezerAnalysis(lezerSyntax),
 	],
 
 	createAnalysisClient() {
 		return new AnalysisClient(new Worker(new URL('./analysis-worker.min.js', import.meta.url), { type: 'module' }));
-	},
-
-	analysisData(analysis, state, version) {
-		return adaptJavaScriptAnalysis(analysis, state.doc.toString(), version, analyzeSyntax(state));
 	},
 
 	diagnostics(text, locale, options = {}) {

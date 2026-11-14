@@ -113,41 +113,42 @@ var commonAnalysisState = StateField.define({
         throw new RangeError("Common analysis does not match the document length");
       }
       if (value && (next.version < value.version || value.stale && next.version <= value.version)) continue;
-      value = next;
+      value = value ? reuseStructureRanges(value, next) : next;
     }
     return value;
   }
 });
+function reuseStructureRanges(previous, next) {
+  const sameRanges = (before, after, sameDetails) => before.length === after.length && before.every((item, i) => {
+    const other = after[i];
+    return item.from === other.from && item.to === other.to && item.kind === other.kind && sameDetails(item, other);
+  });
+  const structures = sameRanges(previous.structures, next.structures, (a, b) => a.branches.length === b.branches.length && a.branches.every((offset, i) => offset === b.branches[i])) ? previous.structures : next.structures;
+  const declarations = sameRanges(previous.declarations, next.declarations, (a, b) => a.mutability === b.mutability && a.scope === b.scope) ? previous.declarations : next.declarations;
+  if (structures === next.structures && declarations === next.declarations) return next;
+  return Object.freeze({ ...next, structures, declarations });
+}
 function mapAnalysis(analysis, transaction) {
-  const mapRange = (range, discardInterior, preserveLayout) => {
-    let affected = false;
-    transaction.changes.iterChanges((from2, to2, newFrom, newTo) => {
-      if (from2 === to2) {
-        if (discardInterior && (preserveLayout ? from2 > range.from && from2 < range.to : from2 >= range.from && from2 <= range.to) && (!preserveLayout || !isSafeLayoutInsertion(transaction, from2, newFrom, newTo))) affected = true;
-      } else if (from2 < range.to && to2 > range.from) {
-        affected = true;
-      }
-    });
+  const changes = [];
+  transaction.changes.iterChangedRanges((from, to) => {
+    changes.push({ from, to });
+  });
+  const mapRange = (range, retainOnEdit) => {
+    const affected = changes.some(({ from: from2, to: to2 }) => retainOnEdit ? from2 <= range.from && to2 >= range.to : from2 === to2 ? from2 >= range.from && from2 <= range.to : from2 < range.to && to2 > range.from);
     if (affected) return null;
     const from = transaction.changes.mapPos(range.from, 1);
     const to = transaction.changes.mapPos(range.to, -1);
     return from < to ? { ...range, from, to } : null;
   };
-  const mapRanges = (ranges, discardInterior, preserveLayout = false) => ranges.map((range) => mapRange(range, discardInterior, preserveLayout)).filter(Boolean);
-  const structures = mapRanges(analysis.structures, true, true).map((item) => ({
+  const mapRanges = (ranges, retainOnEdit = false) => ranges.map((range) => mapRange(range, retainOnEdit)).filter(Boolean);
+  const structures = mapRanges(analysis.structures, true).map((item) => ({
     ...item,
     branches: item.branches.map((position) => transaction.changes.mapPos(position, 1)).filter((position) => position >= item.from && position <= item.to)
   }));
   const declarations = mapRanges(analysis.declarations, true);
-  const syntax = mapRanges(analysis.syntax, true);
-  const references = mapRanges(analysis.references, true);
-  const sections = analysis.sections.filter((item) => {
-    let affected = false;
-    transaction.changes.iterChanges((from, to) => {
-      if (from < to && from <= item.from && to > item.from) affected = true;
-    });
-    return !affected;
-  }).map((item) => ({
+  const syntax = mapRanges(analysis.syntax);
+  const references = mapRanges(analysis.references);
+  const sections = analysis.sections.filter((item) => !changes.some(({ from, to }) => from <= item.from && to > item.from)).map((item) => ({
     ...item,
     from: transaction.changes.mapPos(item.from, 1)
   })).filter((item) => item.from < transaction.newDoc.length);
@@ -161,14 +162,6 @@ function mapAnalysis(analysis, transaction) {
     references,
     sections
   });
-}
-function isSafeLayoutInsertion(transaction, from, newFrom, newTo) {
-  const inserted = transaction.newDoc.sliceString(newFrom, newTo);
-  if (!/^[ \t]*\n[ \t]*$/.test(inserted)) return false;
-  const line = transaction.startState.doc.lineAt(from);
-  if (/\/\/|\/\*|\*\//.test(line.text)) return false;
-  const prefix = line.text.slice(0, from - line.from), suffix = line.text.slice(from - line.from);
-  return !(/\/\/|\b(?:return|throw|break|continue|yield)\s*$/.test(prefix) && suffix.trim()) && !(/[\w$]$/.test(prefix) && /^[\w$]/.test(suffix));
 }
 export {
   commonAnalysisState,

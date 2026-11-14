@@ -71,3 +71,27 @@ test('worker startup and runtime failures are observable', async () => {
 	await ready;
 	assert.equal(worker.terminated, true);
 });
+
+test('JavaScript worker resolves lexical references and excludes property names', () => {
+	const source = [
+		'function outer(arg = external) {',
+		'  { var shared = arg; let block = arg; use(block); }',
+		'  const { value: alias } = arg;',
+		'  use(shared, block, alias, arg.value, arg[alias]);',
+		'}',
+		'use(shared);',
+	].join('\n');
+	const { references } = analyze(source).commonAnalysis;
+	const scopeAt = (fragment, name) => {
+		const from = source.indexOf(fragment) + fragment.indexOf(name);
+		return references.find(item => item.from === from && item.role === 'reference')?.scope;
+	};
+	assert.equal(scopeAt('arg = external', 'external'), 'unknown');
+	assert.equal(scopeAt('use(block)', 'block'), 'local');
+	assert.equal(scopeAt('use(shared, block', 'shared'), 'local');
+	assert.equal(scopeAt('use(shared, block', 'block'), 'unknown');
+	assert.equal(scopeAt('alias, arg.value', 'alias'), 'local');
+	assert.equal(scopeAt('arg.value', 'value'), undefined);
+	assert.equal(scopeAt('arg[alias]', 'alias'), 'local');
+	assert.equal(scopeAt('use(shared);', 'shared'), 'unknown');
+});

@@ -1,5 +1,5 @@
-import { createLocalVariables, isVariableReference } from './syntax-analysis.js';
-import { referencesFromSyntax } from '../../analysis/common-analysis.js';
+import { buildCommonAnalysis } from './common-analysis.js';
+import { createLocalVariables, isVariableReference } from './scope-analysis.js';
 
 const KEYWORDS = new Set([
 	'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
@@ -49,6 +49,7 @@ export function analyzeJava(source, rootNode) {
 		: source.slice(node.startIndex, node.endIndex);
 	const locals = createLocalVariables(textOf);
 	const syntaxHighlights = [];
+	const references = [];
 	const sectionStarts = new Set();
 	const decorations = [];
 	const structures = [];
@@ -153,9 +154,16 @@ export function analyzeJava(source, rootNode) {
 			else if (node.type === 'type_identifier') add(node, 'type');
 			else if (node.type === 'identifier' || node.type === 'field_identifier') {
 				addVariableDeclaration(node);
-				add(node, locals.isReference(node) ? 'local-reference' : identifierKind(node));
-				if (isVariableReference(node)) add(node, 'variable-reference');
-				if (isDefinition(node)) add(node, 'definition');
+				const local = locals.isReference(node);
+				add(node, local ? 'local-reference' : identifierKind(node));
+				const role = isDefinition(node) ? 'definition' : isVariableReference(node) ? 'reference' : null;
+				if (role) {
+					const from = toOffset(node.startIndex), to = toOffset(node.endIndex);
+					if (from !== undefined && to !== undefined && from < to) {
+						references.push({ from, to, role, scope: local ? 'local' : 'unknown' });
+						add(node, role === 'definition' ? 'definition' : 'variable-reference');
+					}
+				}
 			}
 			locals.leave(node);
 			return;
@@ -166,23 +174,15 @@ export function analyzeJava(source, rootNode) {
 
 	visit(rootNode);
 	syntaxHighlights.sort((a, b) => a.from - b.from || a.to - b.to);
-	const references = referencesFromSyntax(syntaxHighlights);
-	const sections = [...sectionStarts].sort((a, b) => a - b)
-		.map(line => ({ kind: 'function', from: lineStarts[line] }));
+	const success = !rootNode.hasError;
+	const sortedSectionStarts = [...sectionStarts].sort((a, b) => a - b);
+	const ranges = { structures, declarations, syntax: syntaxHighlights, references };
 	return {
-		success: !rootNode.hasError,
+		success,
 		syntaxHighlights,
-		sectionStarts: [...sectionStarts].sort((a, b) => a - b),
+		sectionStarts: sortedSectionStarts,
 		decorations,
-		commonAnalysis: {
-			sourceLength: source.length,
-			complete: !rootNode.hasError,
-			structures,
-			declarations,
-			syntax: syntaxHighlights,
-			references,
-			sections,
-		},
+		commonAnalysis: buildCommonAnalysis(source.length, success, ranges, sortedSectionStarts, lineStarts),
 	};
 }
 

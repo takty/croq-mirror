@@ -152,10 +152,9 @@ export async function createEditor(container, { value = '', definitions = [], ..
 			const result = await client.request(cm.state.doc.toString(), version);
 			if (result === null) return null;
 			if (!destroyed && result.version === version && settings.analysis) {
-				const commonAnalysis = language.analysisData(result, cm.state, version);
+				view.setCommonAnalysis({ ...result.commonAnalysis, version });
 				const snapshot = publicAnalysis(result);
 				analysis = structuredClone(snapshot);
-				view.setCommonAnalysis(commonAnalysis);
 				emit('analysis', snapshot);
 			}
 			return structuredClone(publicAnalysis(result));

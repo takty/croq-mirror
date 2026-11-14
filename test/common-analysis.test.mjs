@@ -1,18 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EditorState } from '@codemirror/state';
+import { deleteCharBackward, insertNewlineAndIndent } from '@codemirror/commands';
+import { indentUnit } from '@codemirror/language';
+import { java } from '@codemirror/lang-java';
+import { javascript } from '@codemirror/lang-javascript';
+import { lezerAnalysis, syntaxAnalysisState } from '../src/analysis/lezer-analysis.js';
+import { lezerSyntax as javaSyntax } from '../src/lang/java/lezer-syntax.js';
+import { lezerSyntax as javascriptSyntax } from '../src/lang/js/lezer-syntax.js';
 import { commonAnalysisState, createCommonAnalysis, setCommonAnalysis } from '../src/analysis/common-analysis.js';
-import { adaptJavaScriptAnalysis } from '../src/lang/js/analysis-adapter.js';
 import { analyze } from '../.build/lang/js/analyzer.js';
 
-test('JavaScript adapter converts parser positions and semantic ranges to shared UTF-16 data', () => {
+test('JavaScript worker analysis reports shared UTF-16 ranges and references', () => {
 	const source = '// 😀\nconst total = 2;\nfunction add(value) { return total + value; }';
-	const parsed = analyze(source);
-	const syntax = [
-		{ from: source.indexOf('total'), to: source.indexOf('total') + 5, kind: 'definition' },
-		{ from: source.lastIndexOf('total'), to: source.lastIndexOf('total') + 5, kind: 'variable-reference' },
-	];
-	const result = adaptJavaScriptAnalysis(parsed, source, 9, syntax);
+	const result = createCommonAnalysis({ ...analyze(source).commonAnalysis, version: 9 });
 
 	assert.equal(result.version, 9);
 	assert.equal(result.sourceLength, source.length);
@@ -24,14 +25,14 @@ test('JavaScript adapter converts parser positions and semantic ranges to shared
 	assert.deepEqual(result.sections, [{ kind: 'function', from: source.indexOf('function') }]);
 	assert.ok(result.references.some(item => item.role === 'definition' && item.from === source.indexOf('total')));
 	assert.ok(Object.isFrozen(result) && Object.isFrozen(result.structures));
-	const incomplete = adaptJavaScriptAnalysis(analyze('function unfinished( {'), 'function unfinished( {', 10);
+	const incomplete = createCommonAnalysis({ ...analyze('function unfinished( {').commonAnalysis, version: 10 });
 	assert.equal(incomplete.complete, false);
 	assert.equal(incomplete.sourceLength, 'function unfinished( {'.length);
 });
 
 test('JavaScript conditional branches use common UTF-16 offsets', () => {
 	const source = 'if (ready) { start(); } else { stop(); }';
-	const result = adaptJavaScriptAnalysis(analyze(source), source, 11);
+	const result = createCommonAnalysis({ ...analyze(source).commonAnalysis, version: 11 });
 	const conditional = result.structures.find(item => item.kind === 'conditional');
 	assert.equal(conditional.branches.length, 1);
 	assert.ok(conditional.branches[0] > conditional.from && conditional.branches[0] < conditional.to);
@@ -85,7 +86,8 @@ test('shared analysis invalidates token ranges at insertion boundaries and rejec
 		state = state.update({ changes: { from: position, insert: 'x' } }).state;
 		const stale = state.field(commonAnalysisState);
 		assert.equal(stale.stale, true);
-		assert.deepEqual(stale.declarations, []);
+		const from = position === 1 ? 2 : 1;
+		assert.deepEqual(stale.declarations, [{ from, to: from + 1, kind: 'variable', mutability: 'mutable', scope: 'lexical' }]);
 		assert.deepEqual(stale.syntax, []);
 		assert.deepEqual(stale.references, []);
 	}
@@ -111,15 +113,87 @@ test('shared analysis drops a section whose start is deleted', () => {
 	assert.deepEqual(state.field(commonAnalysisState).sections, []);
 });
 
-test('shared analysis maps enclosing structures across safe newline insertions', () => {
+test('shared analysis retains edited structures until the next analysis', () => {
 	let state = EditorState.create({ doc: 'fn()', extensions: [commonAnalysisState] });
 	state = state.update({ effects: setCommonAnalysis.of(createCommonAnalysis({
 		version: 1, sourceLength: state.doc.length, complete: true,
 		structures: [{ kind: 'function', from: 0, to: state.doc.length, branches: [] }],
 		declarations: [], syntax: [], references: [], sections: [],
 	})) }).state;
-	state = state.update({ changes: { from: 2, insert: '\n  ' } }).state;
+	state = state.update({ changes: { from: 1, to: 2, insert: 'x' } }).state;
 	const analysis = state.field(commonAnalysisState);
 	assert.equal(analysis.stale, true);
 	assert.deepEqual(analysis.structures.map(({ from, to }) => ({ from, to })), [{ from: 0, to: state.doc.length }]);
+});
+
+test('Enter and Backspace between methods retain structures in both languages', () => {
+	for (const [language, first, second] of [
+		[javascript, 'first() {}', 'second() {}'],
+		[java, 'void first() {}', 'void second() {}'],
+	]) {
+		const doc = `class Example {\n  ${first}\n  \n  ${second}\n}`;
+		const snapshot = (state, version) => {
+			const source = state.doc.toString();
+			return {
+				version, sourceLength: source.length, complete: true,
+				structures: [
+					{ kind: 'class', from: 0, to: source.length },
+					...[first, second].map(method => ({
+						kind: 'function', from: source.indexOf(method), to: source.indexOf(method) + method.length,
+					})),
+				],
+				declarations: [], syntax: [], references: [], sections: [],
+			};
+		};
+		let state = EditorState.create({ doc, selection: { anchor: doc.indexOf('\n  \n') + 3 },
+			extensions: [language(), indentUnit.of('\t'), commonAnalysisState] });
+		state = state.update({ effects: setCommonAnalysis.of(snapshot(state, 0)) }).state;
+		const dispatch = transaction => { state = transaction.state; };
+		for (const [index, command] of [insertNewlineAndIndent, deleteCharBackward, insertNewlineAndIndent].entries()) {
+			const previous = state.doc;
+			if (command === deleteCharBackward) {
+				assert.equal(previous.sliceString(state.selection.main.head - 1, state.selection.main.head), '\t');
+			}
+			assert.ok(command({ state, dispatch }));
+			assert.equal(state.doc.lines, previous.lines + (command === deleteCharBackward ? 0 : 1));
+			const mapped = state.field(commonAnalysisState);
+			const fresh = snapshot(state, index + 1);
+			assert.deepEqual(mapped.structures, createCommonAnalysis(fresh).structures);
+			assert.ok(mapped.stale);
+			state = state.update({ effects: setCommonAnalysis.of(fresh) }).state;
+			assert.equal(state.field(commonAnalysisState).structures, mapped.structures);
+			assert.equal(state.field(commonAnalysisState).declarations, mapped.declarations);
+			assert.equal(state.field(commonAnalysisState).stale, false);
+		}
+		const from = state.doc.toString().indexOf(second);
+		state = state.update({ changes: { from, to: from + second.length, insert: '  ' } }).state;
+		assert.deepEqual(state.field(commonAnalysisState).structures.map(item => item.kind), ['class', 'function']);
+	}
+});
+
+test('both Lezer sources replace stale code with comments and restore code on delimiter removal', () => {
+	for (const [language, classifier, source, text] of [
+		[javascript, javascriptSyntax, 'function f() {\n  let value = 1;\n}', 'let value = 1;'],
+		[java, javaSyntax, 'class Example {\n  int value = 1;\n}', 'int value = 1;'],
+	]) {
+		const from = source.indexOf(text);
+		let state = EditorState.create({ doc: source, extensions: [
+			language(), commonAnalysisState, lezerAnalysis(classifier),
+		] });
+		state = state.update({ effects: setCommonAnalysis.of(createCommonAnalysis({
+			version: 1, sourceLength: source.length, complete: true,
+			structures: [], declarations: [], references: [], sections: [],
+			syntax: [{ from, to: from + 3, kind: 'keyword' }],
+		})) }).state;
+		state = state.update({ changes: { from, insert: '//' } }).state;
+		let data = state.field(syntaxAnalysisState).data;
+		assert.ok(data.syntax.some(item => item.from === from && item.kind === 'comment'));
+		assert.ok(!data.syntax.some(item => item.from >= from && item.from < from + text.length + 2 && item.kind !== 'comment'));
+		assert.ok(!data.references.some(item => item.from >= from && item.from < from + text.length + 2));
+		state = state.update({ changes: { from, to: from + 2 } }).state;
+		data = state.field(syntaxAnalysisState).data;
+		assert.ok(data.syntax.some(item => item.from === from && item.kind === 'keyword'));
+		assert.ok(!data.syntax.some(item => item.from === from && item.kind === 'comment'));
+		assert.ok(data.references.some(item => item.from === from + 4 && item.role === 'definition'));
+	}
 });

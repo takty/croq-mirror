@@ -102,10 +102,15 @@ const structurePlugin = ViewPlugin.fromClass(class {
 	}
 
 	update(update) {
+		const before = update.startState.field(commonAnalysisState, false);
+		const after = update.state.field(commonAnalysisState, false);
+		const options = update.state.facet(displayOptions);
 		if (update.docChanged || update.geometryChanged || update.viewportChanged ||
-			update.startState.field(structureField) !== update.state.field(structureField) ||
-			update.startState.field(commonAnalysisState, false) !== update.state.field(commonAnalysisState, false) ||
-			update.startState.facet(displayOptions) !== update.state.facet(displayOptions)) this.refresh();
+			Boolean(before) !== Boolean(after) ||
+			(options.structures && before?.structures !== after?.structures) ||
+			(options.declarations && before?.declarations !== after?.declarations) ||
+			(!after && update.startState.field(structureField) !== update.state.field(structureField)) ||
+			update.startState.facet(displayOptions) !== options) this.refresh();
 	}
 
 	refresh() {
@@ -166,7 +171,16 @@ const structurePlugin = ViewPlugin.fromClass(class {
 
 	write(data) {
 		Object.assign(this.overlay.style, { left: data.left + 'px', top: data.top + 'px', width: data.width + 'px', height: data.height + 'px' });
-		drawStructure(this.canvas, data);
+		const scale = this.canvas.ownerDocument.defaultView.devicePixelRatio;
+		const { width, height, charWidth, lineHeight, decorations } = data;
+		const drawing = JSON.stringify([scale, width, height, charWidth, lineHeight, decorations.map(item =>
+			item.kind === 'range'
+				? [item.kind, item.fill, item.opacity, item.start, item.end.y, item.spine,
+					item.from.line === item.to.line, item.branchWidth, item.branchRows]
+				: [item.kind, item.fill, item.stroke, item.start, item.end])]);
+		if (drawing === this.lastDrawing) return;
+		drawStructure(this.canvas, data, scale);
+		this.lastDrawing = drawing;
 	}
 
 	destroy() {
@@ -224,8 +238,7 @@ export function refreshStructure(view) {
 	view.plugin(structurePlugin)?.refresh();
 }
 
-function drawStructure(canvas, { width, height, charWidth, lineHeight, decorations }) {
-	const scale = canvas.ownerDocument.defaultView.devicePixelRatio;
+function drawStructure(canvas, { width, height, charWidth, lineHeight, decorations }, scale) {
 	const pixelsWide = Math.round(width * scale), pixelsHigh = Math.round(height * scale);
 	if (canvas.width !== pixelsWide) canvas.width = pixelsWide;
 	if (canvas.height !== pixelsHigh) canvas.height = pixelsHigh;

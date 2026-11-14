@@ -1,5 +1,6 @@
 import { Facet, RangeSet, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view';
+import { syntaxAnalysisState } from '../../analysis/lezer-analysis.js';
 import { commonAnalysisState } from '../../analysis/common-analysis.js';
 import { extensionStyles } from '../styles.js';
 import css from './style.css';
@@ -74,8 +75,9 @@ const syntaxHighlights = StateField.define({
 				})).filter(range => range.from < range.to) : [],
 			};
 		}
-		const common = transaction.state.field(commonAnalysisState, false);
-		const commonChanged = transaction.startState.field(commonAnalysisState, false) !== common;
+		const sharedSyntax = transaction.state.field(syntaxAnalysisState, false);
+		const common = sharedSyntax ? null : transaction.state.field(commonAnalysisState, false);
+		const commonChanged = !sharedSyntax && transaction.startState.field(commonAnalysisState, false) !== common;
 		const options = transaction.state.facet(displayOptions);
 		if (commonChanged) {
 			const ranges = common ? commonRanges(common, options) : [];
@@ -158,6 +160,8 @@ function sourceDecorations(state, source) {
 	const common = state.field(commonAnalysisState, false);
 	const options = state.facet(displayOptions);
 	if (supplied.explicit) return supplied.decorations;
+	const sharedSyntax = state.field(syntaxAnalysisState, false);
+	if (sharedSyntax) return decorationsFor(commonRanges(sharedSyntax.data, options), state.doc, options);
 	if (common && !common.stale) {
 		return supplied.current ? supplied.decorations : decorationsFor(commonRanges(common, options), state.doc, options);
 	}
@@ -188,7 +192,8 @@ const sourceHighlights = ViewPlugin.fromClass(class {
 	update(update) {
 		const source = update.state.facet(sourceFacet);
 		if (source !== update.startState.facet(sourceFacet) || update.docChanged || source?.needsRefresh(update) ||
-			update.startState.field(syntaxHighlights) !== update.state.field(syntaxHighlights)) {
+			update.startState.field(syntaxHighlights) !== update.state.field(syntaxHighlights) ||
+			update.startState.field(syntaxAnalysisState, false) !== update.state.field(syntaxAnalysisState, false)) {
 			this.decorations = sourceDecorations(update.state, source);
 		}
 	}

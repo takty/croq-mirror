@@ -35,6 +35,7 @@ try {
 	b = await createEditor(document.querySelector('#b'), { value: 'function two() { return 2; }', language: 'en', autoFormat: false });
 	assert(!window.CodeMirror && !window.acorn && !window.JSHINT && !window.tern, 'no library globals');
 	assert(a.getAnalysis().fnNames[0] === 'one' && b.getAnalysis().fnNames[0] === 'two', 'independent analysis');
+	assert(!('commonAnalysis' in a.getAnalysis()), 'public JavaScript analysis omits internal worker data');
 	assert(getComputedStyle(document.querySelector('#host-page')).color === 'rgb(1, 2, 3)', 'host CSS unaffected');
 	assert(!('getCodeMirror' in a), 'public API does not expose editor instance');
 	const editorA = document.querySelector('#a .cm-editor');

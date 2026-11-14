@@ -33,8 +33,7 @@ export async function runLanguageContractTests(assert) {
 	const source = 'function example() {\n let x = 1;\n if (x) { x++; } else { x--; }\n const y = 2;\n}';
 	const raw = analyze(source);
 	const snapshot = JSON.stringify(raw);
-	const parsedState = EditorState.create({ doc: source, extensions: javascriptLanguage.extensions });
-	const data = javascriptLanguage.analysisData(raw, parsedState, 1);
+	const data = createCommonAnalysis({ ...raw.commonAnalysis, version: 1 });
 	assert(JSON.stringify(raw) === snapshot, 'common analysis conversion preserves public analysis');
 	assert(data.complete && data.sections[0].from === 0, 'analysis supplies language-neutral function sections');
 	const branch = data.structures.find(item => item.kind === 'conditional' && item.branches.length);
@@ -42,12 +41,10 @@ export async function runLanguageContractTests(assert) {
 		'conditional structures and branches use common UTF-16 offsets');
 	assert(data.declarations.filter(item => item.kind === 'variable').length === 2,
 		'variable declarations are represented as common semantic data');
-	assert(!javascriptLanguage.analysisData(analyze('function unfinished( {'),
-		EditorState.create({ doc: 'function unfinished( {', extensions: javascriptLanguage.extensions }), 2).complete,
+	assert(!createCommonAnalysis({ ...analyze('function unfinished( {').commonAnalysis, version: 2 }).complete,
 		'incomplete tolerant analysis does not authorize indentation');
 	const classSource = 'class Example {\n method() {}\n}';
-	const classData = javascriptLanguage.analysisData(analyze(classSource),
-		EditorState.create({ doc: classSource, extensions: javascriptLanguage.extensions }), 3);
+	const classData = createCommonAnalysis({ ...analyze(classSource).commonAnalysis, version: 3 });
 	const classStructure = classData.structures.find(item => item.kind === 'class');
 	assert(classStructure?.from === 0 && classStructure.to === classSource.length && classData.sections.length === 1,
 		'JavaScript class and method data use language-neutral structure and section kinds');

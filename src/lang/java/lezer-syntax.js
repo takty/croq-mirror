@@ -1,5 +1,5 @@
-import { HighlightStyle, syntaxTree } from '@codemirror/language';
-import { highlightTree, tags } from '@lezer/highlight';
+import { HighlightStyle } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 
 const style = HighlightStyle.define([
 	{ tag: tags.comment, class: 'comment' },
@@ -18,28 +18,23 @@ const typeDeclarations = new Set([
 	'RecordDeclaration', 'AnnotationTypeDeclaration', 'TypeParameter',
 ]);
 
-export function analyzeEditorSyntax(state) {
-	const tree = syntaxTree(state);
-	const ranges = [];
-	highlightTree(tree, style, (from, to, classes) => {
+export const lezerSyntax = {
+	style,
+	classify(tree, kind, from, to, add) {
 		const node = tree.resolveInner(from, 1);
-		for (const kind of new Set(classes.split(' '))) {
-			if (kind === 'definition') {
-				const parent = node.parent?.name;
-				if (typeDeclarations.has(parent)) {
-					ranges.push({ from, to, kind: 'type' });
-				} else {
-					ranges.push({ from, to, kind });
-					ranges.push({ from, to, kind: parent === 'MethodDeclaration' ? 'function' : 'variable' });
-				}
-			} else {
-				ranges.push({ from, to, kind });
-				if (kind === 'variable' && isReference(node)) ranges.push({ from, to, kind: 'variable-reference' });
+		if (kind === 'definition') {
+			const parent = node.parent?.name;
+			if (typeDeclarations.has(parent)) add(from, to, 'type');
+			else {
+				add(from, to, kind);
+				add(from, to, parent === 'MethodDeclaration' ? 'function' : 'variable');
 			}
+		} else {
+			add(from, to, kind);
+			if (kind === 'variable' && isReference(node)) add(from, to, 'variable-reference');
 		}
-	});
-	return ranges;
-}
+	},
+};
 
 function isReference(node) {
 	const parent = node.parent;

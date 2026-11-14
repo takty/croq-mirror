@@ -11,9 +11,14 @@ change at runtime.
   rejection of stale asynchronous results. Public analysis snapshots retain
   their existing shape.
 - A language module owns its parser, diagnostics, completion, formatting, and
-  conversion from parser-specific results to common analysis data.
-- `commonAnalysisState` owns the current shared data per editor. It maps ranges
-  unaffected by edits as stale interim data, clears on document load, and only
+  worker-side analysis from parser-specific trees to common analysis data.
+- JavaScript and Java use the same module layout. `index.js` connects the
+  language to the editor, `analysis-worker.js` handles worker messages, and
+  `analyzer.js` traverses the parser tree and returns the analysis result.
+  `common-analysis.js` builds the common snapshot, `scope-analysis.js` resolves
+  references, and `lezer-syntax.js` configures the shared Lezer syntax source.
+- `commonAnalysisState` owns the current shared data per editor. It maps surviving
+  structure and declaration ranges across edits as stale interim data, clears on document load, and only
   accepts results for the current document version.
 - `Editor` owns the CodeMirror state, settings, and extension assembly. It
   publishes analysis through `setCommonAnalysis`; display extensions do not
@@ -21,7 +26,7 @@ change at runtime.
 - `structure-view` renders shared structures and declarations on a canvas.
   `structureViewOptions` independently enables either category.
 - `syntax-highlighting` consumes common syntax and references while allowing
-  synchronous language-provided interim syntax ranges.
+  the reconciled syntax state.
 - `function-line-numbers` and `function-scroll-markers` independently consume
   common function sections. They do not depend on one another.
 - `bracket-matching` combines CodeMirror's standard bracket matching with the
@@ -41,8 +46,7 @@ and no completion or formatting result; it creates no worker.
 | `extensions` | Language-specific CodeMirror syntax and synchronous interim sources; no display assembly |
 | `supportsFunctionSections` | Whether the language can provide function or method section data |
 | `supportsBracketMatching` | Whether the language supports the shared bracket-matching display |
-| `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`; `request` resolves to a snapshot or null |
-| `analysisData(analysis, state, version)` | Converts a parser snapshot into the shared analysis schema for this document |
+| `createAnalysisClient()` | Returns `{ ready, request(text, version), destroy() }`. A worker snapshot includes internal `commonAnalysis`. Plain text resolves to null. |
 | `diagnostics(text, locale, options)` | Returns `{ message, severity, from, to }[]`; severity is error or warning |
 | `completionTrigger(key)` | Returns `null` or `{ delay, allowShort }` |
 | `createCompletionSession()` | Creates per-editor completion state; callbacks use UTF-16 document offsets |
@@ -62,7 +66,7 @@ view renders them as a tooltip at the supplied document offset.
 
 ## Common analysis data
 
-`analysisData()` returns a validated snapshot with `version`, `sourceLength`,
+The editor validates the worker snapshot with `version`, `sourceLength`,
 `complete`, `structures`, `declarations`, `syntax`, `references`, and `sections`.
 All positions are zero-based UTF-16 offsets from the document start; ranges have
 exclusive ends. `complete` indicates whether the source parse was complete.
@@ -81,8 +85,10 @@ partial data available, not parser-specific node names.
 - Sections identify function or method starts by offset.
 
 The shared snapshot lives in the per-editor `commonAnalysisState` field.
-Unchanged ranges may be mapped across edits and marked `stale` until the next
-version-checked worker result arrives. After an edit, the replacement result
+Structure and declaration ranges are mapped across edits and marked `stale`
+until the next version-checked worker result arrives. Fully replaced or deleted
+ranges are dropped immediately. The structure view skips repainting when the
+measured drawing is unchanged. After an edit, the replacement result
 must carry a strictly newer document version; a result at the mapped snapshot's
 version is rejected even when the edited document has the same length.
 Standalone publishers should use monotonically increasing document revisions.
@@ -98,12 +104,16 @@ identity remains consistent.
 
 ## Syntax source and brackets
 
-The syntax extension can combine fresh shared ranges with a language-provided
-synchronous source while asynchronous parsing is pending. JavaScript supplies
-Lezer ranges; Java supplies CodeMirror syntax-tree ranges until Tree-sitter
-results arrive. Both sources produce the shared extension's generic range
-format. `syntaxHighlight` controls token coloring and `semanticHighlight`
-controls definitions and references independently.
+Both languages register their Lezer token classifiers with the shared syntax
+state. The state refreshes when CodeMirror updates the syntax tree and
+reconciles the parsed region with mapped worker ranges. In that region, fresh
+Lezer tokens replace stale syntax, including when comment delimiters change.
+References may retain worker classifications for matching occurrences. JavaScript
+also provides interim local reference classifications for immediate editing
+and when automatic analysis is disabled. Worker analysis derives references
+from Acorn for JavaScript and Tree-sitter for Java.
+`syntaxHighlight` controls token coloring and `semanticHighlight` controls
+definitions and references independently.
 
 Bracket matching is not part of common analysis. CodeMirror's standard
 `bracketMatching()` handles cursor-adjacent pairs, while the extension adds

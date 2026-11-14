@@ -236,15 +236,15 @@ as immutable after dispatch. Document changes or a `load` user event
 clear the display by default; dispatch `setStructure.of([])` to clear it explicitly.
 Standalone users can opt into `retainStructureOnEdit` (also exported by the
 extension): it discards items spanning edited lines and maps other items to their
-new positions. The component instead consumes its versioned common analysis,
-which maps unaffected ranges as stale interim data until fresh analysis arrives.
+new positions.
 Ordinary newline insertions and automatic
 indentation preserve enclosing and shifted structures; splitting an identifier,
 a line comment, or a restricted statement is treated more conservatively.
 Edits to delimiters or comments also discard later items because their
 interpretation may change.
-This is a conservative heuristic, not a syntax analysis; other edits can also
-affect syntax outside the edited lines. A `load` always clears retained data. The
+The component uses versioned common analysis. It maps surviving structure and
+declaration ranges to their new positions until fresh analysis arrives. The
+canvas is repainted when the measured drawing changes. A `load` always clears retained data. The
 extension owns and removes its canvas when the editor or extension is destroyed.
 
 ### Function line-number extension
@@ -322,21 +322,20 @@ view.dispatch({ effects: setSyntaxHighlights.of([
 
 Supported kinds are `comment`, `keyword`, `operator`, `type`, `function`, `variable`,
 `literal`, `invalid`, `definition`, `property`, `local-variable`,
-`local-reference`, and `variable-reference`. Java's Tree-sitter worker supplies ranges through
-`setSyntaxHighlights`. JavaScript supplies ranges from its Lezer tree through
-`syntaxHighlightingSource(analyze, needsRefresh)`, which adds a synchronous
-source to the same extension. The source callback receives an `EditorState`;
-the optional `needsRefresh` receives a `ViewUpdate` for changes such as
-incremental syntax-tree updates. Document edits always refresh the source.
-Java uses `syntaxHighlightingSource(analyze, needsRefresh, { retainOnEdit: true })`
-to keep previously supplied ranges mapped across edits and fill uncovered
-positions from its CodeMirror syntax tree until the next worker result arrives.
-Its `reconcileComments` option returns the end of the currently parsed document
-and lets synchronous comment ranges override retained code styling (and vice
-versa) within that parsed region. Retained ranges beyond it remain untouched.
-These retained ranges can temporarily reflect an earlier semantic classification;
-loading a document clears them. With automatic analysis disabled, only the
-CodeMirror-based syntax coloring is available.
+`local-reference`, and `variable-reference`. The editor component synchronously
+reads the CodeMirror Lezer tree in both languages and reconciles its ranges with
+worker results. New Lezer tokens update the parsed region during edits, including
+when a comment delimiter is added or removed. Document loads clear retained
+ranges. With automatic analysis disabled, the Lezer syntax tree still provides
+immediate highlighting.
+
+Standalone consumers can also use `syntaxHighlightingSource(analyze, needsRefresh)`
+with a synchronous callback that receives an `EditorState`. The optional
+`needsRefresh` callback receives a `ViewUpdate`. With `retainOnEdit: true`, the
+extension maps previously supplied ranges across edits. A `reconcileComments`
+callback may return the parsed region's end to resolve overlaps between
+retained code and fresh comments.
+
 Removing the highlighting extension removes the source's decorations. Local
 reference color can be customized with `--croq-syntax-local-variable-color`.
 The background, shadow, and radius of variable references can be customized with
@@ -414,7 +413,7 @@ by the extensions are applied directly and are not CSS custom properties.
 
 ## Sources and build
 
-`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/analysis/` defines and manages shared parser data. `src/extensions/` contains the structure view, syntax highlighting, function line numbers, function scroll markers, bracket matching, gutter line selection, and indentation rulers. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` and `src/lang/java/` contain language-specific parsers and adapters, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
+`src/index.js` is the component's public API entry point. Common implementation modules (`editor-view.js` and `analysis-client.js`) live directly in `src/`. `src/analysis/` defines and manages shared parser data. `src/extensions/` contains the structure view, syntax highlighting, function line numbers, function scroll markers, bracket matching, gutter line selection, and indentation rulers. Whitespace highlighting is built into the editor and styled in `src/styles/index.css`. `src/lang/js/` and `src/lang/java/` contain language-specific analyzers and Lezer classifiers, and `src/lang/language-interface.md` describes the internal language contract. `src/styles/` contains the theme, and `dist/` the distribution. External library wrappers are generated in `.build/lib/` during the build.
 `build.mjs` wraps dependency browser builds in ES modules without adding globals to window.
 It organizes library preparation, JavaScript bundling, styles, and licenses into separate steps, using `tasks.mjs` for package resolution and file copying/writing.
 `src/styles/index.css` imports `variables.css`; both scope their rules to the component. The build bundles these files into the distributed stylesheet. CodeMirror 6 installs its base styles when an editor is mounted.

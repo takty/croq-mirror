@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { Language, Parser } from 'web-tree-sitter';
-import { adaptJavaAnalysis } from '../src/lang/java/analysis-adapter.js';
+import { createCommonAnalysis } from '../src/analysis/common-analysis.js';
 import { analyzeJava } from '../src/lang/java/analyzer.js';
 
 await Parser.init();
@@ -38,7 +38,7 @@ test('Java highlights lexical variable references without confusing declarations
 	try {
 		const result = analyzeJava(source, tree.rootNode);
 		assert.equal(result.success, true);
-		const common = adaptJavaAnalysis(result, 7);
+		const common = createCommonAnalysis({ ...result.commonAnalysis, version: 7 });
 		assert.equal(common.version, 7);
 		assert.equal(common.sourceLength, source.length);
 		assert.ok(common.structures.some(item => item.kind === 'loop'));
@@ -130,12 +130,12 @@ test('Java emits class ranges before their methods without changing method secti
 	}
 });
 
-test('Java adapter retains bounded partial data for incomplete source', () => {
+test('Java analysis retains bounded partial data for incomplete source', () => {
 	const source = 'class Incomplete { void run( { int value = }';
 	const tree = parser.parse(source);
 	try {
 		const result = analyzeJava(source, tree.rootNode);
-		const common = adaptJavaAnalysis(result, 8);
+		const common = createCommonAnalysis({ ...result.commonAnalysis, version: 8 });
 		assert.equal(common.complete, false);
 		assert.equal(common.sourceLength, source.length);
 		assert.ok(common.syntax.every(item => item.from >= 0 && item.to <= source.length));

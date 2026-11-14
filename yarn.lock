@@ -5,7 +5,7 @@ __metadata:
   version: 10
   cacheKey: 10c0
 
-"@codemirror/autocomplete@npm:6.20.4":
+"@codemirror/autocomplete@npm:6.20.4, @codemirror/autocomplete@npm:^6.0.0":
   version: 6.20.4
   resolution: "@codemirror/autocomplete@npm:6.20.4"
   dependencies:
@@ -14,18 +14,6 @@ __metadata:
     "@codemirror/view": "npm:^6.17.0"
     "@lezer/common": "npm:^1.0.0"
   checksum: 10c0/f823a470dd0eccecc83e6ec527017c8fa70f2c4e98e4d4a1ed1d93b671f7271e590fb6899cd22a6608ffb1fb44b09613685969c1a43928cb80639640e4055da1
-  languageName: node
-  linkType: hard
-
-"@codemirror/autocomplete@npm:^6.0.0":
-  version: 6.20.1
-  resolution: "@codemirror/autocomplete@npm:6.20.1"
-  dependencies:
-    "@codemirror/language": "npm:^6.0.0"
-    "@codemirror/state": "npm:^6.0.0"
-    "@codemirror/view": "npm:^6.17.0"
-    "@lezer/common": "npm:^1.0.0"
-  checksum: 10c0/ec3ecdd8098778c0764827ffcb6252edc763de3500314ad6b36d77bd09f73c03cb9a95b952b2b928354e1c83f2ae1bfef92b406eae40f94b47104b51bd508b35
   languageName: node
   linkType: hard
 
@@ -66,7 +54,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@codemirror/language@npm:6.13.1":
+"@codemirror/language@npm:6.13.1, @codemirror/language@npm:^6.0.0, @codemirror/language@npm:^6.6.0":
   version: 6.13.1
   resolution: "@codemirror/language@npm:6.13.1"
   dependencies:
@@ -81,21 +69,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@codemirror/language@npm:^6.0.0, @codemirror/language@npm:^6.6.0":
-  version: 6.12.3
-  resolution: "@codemirror/language@npm:6.12.3"
-  dependencies:
-    "@codemirror/state": "npm:^6.0.0"
-    "@codemirror/view": "npm:^6.23.0"
-    "@lezer/common": "npm:^1.5.0"
-    "@lezer/highlight": "npm:^1.0.0"
-    "@lezer/lr": "npm:^1.0.0"
-    style-mod: "npm:^4.0.0"
-  checksum: 10c0/682d476f35f187a8d2f59f9b2e561045353c87736e5774b5b8dd22ade7deb3c85b9d3cdde988b00aafb345732144c134adf45dadab067430aaee159abcc456a4
-  languageName: node
-  linkType: hard
-
-"@codemirror/lint@npm:6.9.8":
+"@codemirror/lint@npm:6.9.8, @codemirror/lint@npm:^6.0.0":
   version: 6.9.8
   resolution: "@codemirror/lint@npm:6.9.8"
   dependencies:
@@ -103,17 +77,6 @@ __metadata:
     "@codemirror/view": "npm:^6.42.0"
     crelt: "npm:^1.0.5"
   checksum: 10c0/d2c3504ec8049e87c747a4e10c89f6841755b6876bebd8b5f6a9f23155e5ccca6d3c268bc043492628fd2415d832d469cdefba4bab6de79fc1596ee41e65925b
-  languageName: node
-  linkType: hard
-
-"@codemirror/lint@npm:^6.0.0":
-  version: 6.9.5
-  resolution: "@codemirror/lint@npm:6.9.5"
-  dependencies:
-    "@codemirror/state": "npm:^6.0.0"
-    "@codemirror/view": "npm:^6.35.0"
-    crelt: "npm:^1.0.5"
-  checksum: 10c0/74fb810ffe491cfb4f1d30cd97560f4d4c5e598e34d4e3814989750ba82de9c921df6afb2b25a9972364e9beb38512a80db940d98d648cd136e991ffa21b85fd
   languageName: node
   linkType: hard
 
@@ -128,21 +91,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@codemirror/state@npm:6.7.6, @codemirror/state@npm:^6.7.0":
+"@codemirror/state@npm:6.7.6, @codemirror/state@npm:^6.0.0, @codemirror/state@npm:^6.7.0":
   version: 6.7.6
   resolution: "@codemirror/state@npm:6.7.6"
   dependencies:
     "@marijn/find-cluster-break": "npm:^1.0.0"
   checksum: 10c0/1ea16c30571210d40f6161a3a43b221fa1522fdcfef4836f6063dcd3d04fd2d5f4aefbc5cfdcd30f7d9df96985967cfb12cd876e4abb1cd41bff41ec8f3d328e
-  languageName: node
-  linkType: hard
-
-"@codemirror/state@npm:^6.0.0, @codemirror/state@npm:^6.6.0":
-  version: 6.6.0
-  resolution: "@codemirror/state@npm:6.6.0"
-  dependencies:
-    "@marijn/find-cluster-break": "npm:^1.0.0"
-  checksum: 10c0/4e5d6ddd28fc642e8d749fe80a7dd278afd547e4d93c562eaab6f23bdf25bb12a94226db3efab6321d458c531eb6d357184809f3704aee419fe3230d53f16e24
   languageName: node
   linkType: hard
 
@@ -153,7 +107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@codemirror/view@npm:6.43.15, @codemirror/view@npm:^6.42.0":
+"@codemirror/view@npm:6.43.15, @codemirror/view@npm:^6.17.0, @codemirror/view@npm:^6.23.0, @codemirror/view@npm:^6.27.0, @codemirror/view@npm:^6.37.0, @codemirror/view@npm:^6.42.0":
   version: 6.43.15
   resolution: "@codemirror/view@npm:6.43.15"
   dependencies:
@@ -162,18 +116,6 @@ __metadata:
     style-mod: "npm:^4.1.0"
     w3c-keyname: "npm:^2.2.4"
   checksum: 10c0/314cb8a46634b522c706757fbb0b673d468eecf5ab5fe9d5c7e586a2a20c6deb2a2f61c0813cf9153dc3cc4ff7607a399c22fef6162d9656e674f5f18a127065
-  languageName: node
-  linkType: hard
-
-"@codemirror/view@npm:^6.17.0, @codemirror/view@npm:^6.23.0, @codemirror/view@npm:^6.27.0, @codemirror/view@npm:^6.35.0, @codemirror/view@npm:^6.37.0":
-  version: 6.41.0
-  resolution: "@codemirror/view@npm:6.41.0"
-  dependencies:
-    "@codemirror/state": "npm:^6.6.0"
-    crelt: "npm:^1.0.6"
-    style-mod: "npm:^4.1.0"
-    w3c-keyname: "npm:^2.2.4"
-  checksum: 10c0/7d7a5e184496d0c54083ec12bb080900064f0965b83b4db9f27890721c863e18c82e33573529799128f452c3e5c7c27af11e108c552574597ecca7eb27499a0c
   languageName: node
   linkType: hard
 
@@ -403,21 +345,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@lezer/highlight@npm:1.2.5":
+"@lezer/highlight@npm:1.2.5, @lezer/highlight@npm:^1.0.0, @lezer/highlight@npm:^1.1.3":
   version: 1.2.5
   resolution: "@lezer/highlight@npm:1.2.5"
   dependencies:
     "@lezer/common": "npm:^1.3.0"
   checksum: 10c0/cb40f6efd8ba947b4a391368114ae394e36cbb2b7db07a7629278f9feed953d909868296f4acb936c7b70e4e7032458c5fcd6a2e836012ae6c02790b2de574fa
-  languageName: node
-  linkType: hard
-
-"@lezer/highlight@npm:^1.0.0, @lezer/highlight@npm:^1.1.3":
-  version: 1.2.3
-  resolution: "@lezer/highlight@npm:1.2.3"
-  dependencies:
-    "@lezer/common": "npm:^1.3.0"
-  checksum: 10c0/3bcb4fce7a1a45b5973895d7cb2be47970a0098700f2a0970aef9878ffd37f540285a2d7388ec1f524726ec90cc5196b5701bbb9764b7e7300786d772b7d2ce2
   languageName: node
   linkType: hard
 
@@ -1185,7 +1118,7 @@ __metadata:
     strip-json-comments: "npm:1.0.x"
   bin:
     jshint: ./bin/jshint
-  checksum: 10c0/6a69d76d209dfbf6cdc8d564daf40dc415a5ce1f8d737e8d695ae10dad89361870688b1b359609215f044338bc16e4fa19f6aa50b5e64af2654ed28b2cd81871
+  checksum: 10c0/f69271f45e353d0c29d2ca0697330556a3242fcce2736c9df1641894bf65f0a407cc2bca7ddba2f796f6ece70881439fd2fe0ccdab05f05e98c4453b32d7c9a2
   languageName: node
   linkType: hard
 
