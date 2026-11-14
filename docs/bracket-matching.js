@@ -61,32 +61,46 @@ var bracketGutterOverlay = ViewPlugin2.fromClass(class {
       }
       const box = bracket.getBoundingClientRect();
       const fontSize = window.getComputedStyle(bracket).fontSize;
-      if (box.left < gutterBox.right || box.left - 0.75 * parseFloat(fontSize) >= gutterBox.right) continue;
+      if (box.left < gutterBox.right || box.left - 0.75 * parseFloat(fontSize) >= gutterBox.right) {
+        continue;
+      }
       marks.push({ left: box.left - left, top: box.top - frame.top, width: box.width, height: box.height, fontSize });
     }
-    return { left: left - editor.left, top: frame.top - editor.top, width, height: view.scrollDOM.clientHeight, marks };
+    return {
+      left: left - editor.left,
+      top: frame.top - editor.top,
+      width,
+      height: view.scrollDOM.clientHeight,
+      marks
+    };
   }
   write(data) {
     if (!data) {
       this.overlay.replaceChildren();
       return;
     }
-    Object.assign(this.overlay.style, {
-      left: data.left + "px",
-      top: data.top + "px",
-      width: data.width + "px",
-      height: data.height + "px"
-    });
+    Object.assign(
+      this.overlay.style,
+      {
+        left: data.left + "px",
+        top: data.top + "px",
+        width: data.width + "px",
+        height: data.height + "px"
+      }
+    );
     const marks = data.marks.map((mark) => {
       const element = this.overlay.ownerDocument.createElement("span");
       element.className = "cm-bracket-gutter-mark";
-      Object.assign(element.style, {
-        left: mark.left + "px",
-        top: mark.top + "px",
-        width: mark.width + "px",
-        height: mark.height + "px",
-        fontSize: mark.fontSize
-      });
+      Object.assign(
+        element.style,
+        {
+          left: mark.left + "px",
+          top: mark.top + "px",
+          width: mark.width + "px",
+          height: mark.height + "px",
+          fontSize: mark.fontSize
+        }
+      );
       return element;
     });
     this.overlay.replaceChildren(...marks);

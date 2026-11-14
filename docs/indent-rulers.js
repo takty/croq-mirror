@@ -53,7 +53,9 @@ var rulerPlugin = ViewPlugin2.fromClass(class {
     this.refresh();
   }
   update(update) {
-    if (update.docChanged || update.geometryChanged || update.viewportChanged) this.refresh();
+    if (update.docChanged || update.geometryChanged || update.viewportChanged) {
+      this.refresh();
+    }
   }
   refresh() {
     this.view.requestMeasure(this.measure);
@@ -76,7 +78,15 @@ var rulerPlugin = ViewPlugin2.fromClass(class {
     };
   }
   write(data) {
-    Object.assign(this.overlay.style, { left: data.left + "px", top: data.top + "px", width: data.width + "px", height: data.height + "px" });
+    Object.assign(
+      this.overlay.style,
+      {
+        left: data.left + "px",
+        top: data.top + "px",
+        width: data.width + "px",
+        height: data.height + "px"
+      }
+    );
     this.ruler.style.left = data.rulerX + "px";
     this.ruler.style.setProperty("--ruler-character-width", data.charWidth + "px");
   }

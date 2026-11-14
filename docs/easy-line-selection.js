@@ -38,9 +38,13 @@ var setLineSelectionMode = setEasyLineSelectionMode;
 var lineSelectionMode = StateField.define({
   create: () => false,
   update(value, transaction) {
-    if (transaction.docChanged || transaction.isUserEvent("load") || transaction.selection && transaction.state.selection.main.empty) value = false;
+    if (transaction.docChanged || transaction.isUserEvent("load") || transaction.selection && transaction.state.selection.main.empty) {
+      value = false;
+    }
     for (const effect of transaction.effects) {
-      if (effect.is(setEasyLineSelectionMode)) value = !!effect.value;
+      if (effect.is(setEasyLineSelectionMode)) {
+        value = !!effect.value;
+      }
     }
     return value;
   },

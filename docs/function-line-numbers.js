@@ -58,8 +58,11 @@ function getSectionLineNumber(state, line) {
   let low = 0, high = starts.length;
   while (low < high) {
     const middle = low + high >>> 1;
-    if (starts[middle] <= line) low = middle + 1;
-    else high = middle;
+    if (starts[middle] <= line) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
   }
   return [low, line - (starts[low - 1] ?? 0) + 1];
 }

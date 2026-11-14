@@ -74,7 +74,9 @@ function createCommonAnalysis(data) {
   });
   const sections = copyPositions(data.sections, data.sourceLength);
   for (const ranges of [structures, declarations, syntax, references, sections]) {
-    for (const range of ranges) Object.freeze(range);
+    for (const range of ranges) {
+      Object.freeze(range);
+    }
     Object.freeze(ranges);
   }
   return Object.freeze({
@@ -192,7 +194,9 @@ function readLezer(state, tree, classifier) {
     if (from < to) ranges.push({ from, to, kind });
   };
   highlightTree(tree, classifier.style, (from, to, classes) => {
-    for (const kind of new Set(classes.split(" "))) classifier.classify(tree, kind, from, to, add);
+    for (const kind of new Set(classes.split(" "))) {
+      classifier.classify(tree, kind, from, to, add);
+    }
   });
   classifier.collectInterimReferences?.(tree, state, add);
   return {
@@ -203,7 +207,10 @@ function readLezer(state, tree, classifier) {
 function reconcile(interim, parsedTo, analysis) {
   if (!analysis) return interim;
   if (!analysis.stale) {
-    return { syntax: analysis.syntax.length ? analysis.syntax : interim.syntax, references: analysis.references };
+    return {
+      syntax: analysis.syntax.length ? analysis.syntax : interim.syntax,
+      references: analysis.references
+    };
   }
   const retainedReferences = new Map(analysis.references.map((reference) => [
     referenceKey(reference),
@@ -213,8 +220,12 @@ function reconcile(interim, parsedTo, analysis) {
     syntax: [
       ...interim.syntax,
       ...analysis.syntax.flatMap((range) => {
-        if (range.from >= parsedTo) return [range];
-        if (range.kind === "comment" && range.to > parsedTo) return [{ ...range, from: parsedTo }];
+        if (range.from >= parsedTo) {
+          return [range];
+        }
+        if (range.kind === "comment" && range.to > parsedTo) {
+          return [{ ...range, from: parsedTo }];
+        }
         return [];
       })
     ],
@@ -235,7 +246,9 @@ function updateSyntax(state, previous) {
   const tree = syntaxTree(state);
   const analysis = state.field(commonAnalysisState, false);
   const interim = previous?.tree === tree && previous.doc === state.doc && previous.classifier === classifier ? previous.interim : { ...readLezer(state, tree, classifier), classifiesLocalReferences: !!classifier.collectInterimReferences };
-  if (previous?.interim === interim && previous.analysis === analysis) return previous;
+  if (previous?.interim === interim && previous.analysis === analysis) {
+    return previous;
+  }
   return {
     doc: state.doc,
     tree,
@@ -324,13 +337,18 @@ function activeRanges(ranges, options) {
 }
 function commonRanges(analysis, options) {
   const ranges = analysis.syntax.filter(({ kind }) => kind === "local-variable");
-  if (options.syntax) ranges.push(...analysis.syntax.filter(({ kind }) => syntaxKinds2.has(kind)));
+  if (options.syntax) {
+    ranges.push(...analysis.syntax.filter(({ kind }) => syntaxKinds2.has(kind)));
+  }
   if (options.semantic) {
     for (const { from, to, role, scope } of analysis.references) {
-      if (role === "definition") ranges.push({ from, to, kind: "definition" });
-      else {
+      if (role === "definition") {
+        ranges.push({ from, to, kind: "definition" });
+      } else {
         ranges.push({ from, to, kind: "variable-reference" });
-        if (scope === "local") ranges.push({ from, to, kind: "local-reference" });
+        if (scope === "local") {
+          ranges.push({ from, to, kind: "local-reference" });
+        }
       }
     }
   }
@@ -406,34 +424,48 @@ function reconcileRetainedComments(decorations, ranges, doc, parsedTo) {
   const comments = [];
   for (const range of ranges.filter((range2) => range2.kind === "comment" && range2.from < parsedTo).sort((a, b) => a.from - b.from)) {
     const previous = comments.at(-1), to = Math.min(range.to, parsedTo);
-    if (previous && range.from <= previous.to) previous.to = Math.max(previous.to, to);
-    else comments.push({ from: range.from, to });
+    if (previous && range.from <= previous.to) {
+      previous.to = Math.max(previous.to, to);
+    } else {
+      comments.push({ from: range.from, to });
+    }
   }
   const retained = [];
   decorations.between(0, doc.length, (from, to, decoration) => {
     let low = 0, high = comments.length;
     while (low < high) {
       const middle = low + high >>> 1;
-      if (comments[middle].to <= from) low = middle + 1;
-      else high = middle;
+      if (comments[middle].to <= from) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
     }
     if (decoration.spec.class === "cm-syntax-comment") {
       for (let i = low; i < comments.length && comments[i].from < to; i++) {
         const comment = comments[i];
         const start = Math.max(from, comment.from), end = Math.min(to, comment.to, parsedTo);
-        if (start < end) retained.push(decoration.range(start, end));
+        if (start < end) {
+          retained.push(decoration.range(start, end));
+        }
       }
-      if (to > parsedTo) retained.push(decoration.range(Math.max(from, parsedTo), to));
+      if (to > parsedTo) {
+        retained.push(decoration.range(Math.max(from, parsedTo), to));
+      }
     } else {
       let start = from;
       for (let i = low; i < comments.length && comments[i].from < to; i++) {
         const comment = comments[i];
         if (comment.to <= start) continue;
-        if (comment.from > start) retained.push(decoration.range(start, comment.from));
+        if (comment.from > start) {
+          retained.push(decoration.range(start, comment.from));
+        }
         start = Math.max(start, comment.to);
         if (start >= to) break;
       }
-      if (start < to) retained.push(decoration.range(start, to));
+      if (start < to) {
+        retained.push(decoration.range(start, to));
+      }
     }
   });
   return Decoration.set(retained, true);
@@ -444,22 +476,32 @@ function sourceDecorations(state, source) {
   const options = state.facet(displayOptions);
   if (supplied.explicit) return supplied.decorations;
   const sharedSyntax = state.field(syntaxAnalysisState, false);
-  if (sharedSyntax) return decorationsFor(commonRanges(sharedSyntax.data, options), state.doc, options);
+  if (sharedSyntax) {
+    return decorationsFor(commonRanges(sharedSyntax.data, options), state.doc, options);
+  }
   if (common && !common.stale) {
     return supplied.current ? supplied.decorations : decorationsFor(commonRanges(common, options), state.doc, options);
   }
-  if (!source || source.retainOnEdit && supplied.current) return supplied.decorations;
+  if (!source || source.retainOnEdit && supplied.current) {
+    return supplied.decorations;
+  }
   const ranges = source.analyze(state);
-  if (!source.retainOnEdit) return decorationsFor(ranges, state.doc, options);
+  if (!source.retainOnEdit) {
+    return decorationsFor(ranges, state.doc, options);
+  }
   const retained = source.reconcileComments ? reconcileRetainedComments(supplied.decorations, activeRanges(ranges, options), state.doc, source.reconcileComments(state)) : supplied.decorations;
   const uncovered = [];
   for (const range of activeRanges(ranges, options)) {
     let from = range.from;
     retained.between(range.from, range.to, (start, end) => {
-      if (start > from) uncovered.push({ ...range, from, to: Math.min(start, range.to) });
+      if (start > from) {
+        uncovered.push({ ...range, from, to: Math.min(start, range.to) });
+      }
       from = Math.max(from, end);
     });
-    if (from < range.to) uncovered.push({ ...range, from, to: range.to });
+    if (from < range.to) {
+      uncovered.push({ ...range, from, to: range.to });
+    }
   }
   return RangeSet.join([retained, decorationsFor(uncovered, state.doc, options)]);
 }

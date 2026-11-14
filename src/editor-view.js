@@ -1,5 +1,5 @@
 import { Compartment, EditorState, Prec, StateEffect, StateField, Text, Transaction } from '@codemirror/state';
-import { Decoration, EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
+import { Decoration, EditorView, highlightActiveLine, highlightActiveLineGutter, highlightWhitespace, keymap, showTooltip } from '@codemirror/view';
 import {
 	cursorDocEnd, cursorDocStart, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp,
 	defaultKeymap, deleteLine, history, historyKeymap, indentLess, insertTab,
@@ -16,6 +16,7 @@ import { bracketMatchingExtension } from './extensions/bracket-matching/index.js
 import { absoluteLineNumbers, functionLineNumbers, getSectionLineNumber } from './extensions/function-line-numbers/index.js';
 import { functionScrollMarkers, refreshFunctionScrollMarkers } from './extensions/function-scroll-markers/index.js';
 import { easyLineSelection, setEasyLineSelectionMode, standardGutterLineSelection } from './extensions/gutter-line-selection/index.js';
+import { fullLineSelection } from './extensions/full-line-selection/index.js';
 import { indentRulers, refreshIndentRulers } from './extensions/indent-rulers/index.js';
 import { syntaxHighlightingExtension, syntaxHighlightingOptions } from './extensions/syntax-highlighting/index.js';
 import { refreshStructure, structureView, structureViewOptions } from './extensions/structure-view/index.js';
@@ -152,7 +153,7 @@ export class Editor {
 				Prec.high(keymap.of([...customKeys, ...legacyKeymap])),
 				this.options.closeBrackets.of([]),
 				keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap]),
-				drawSelection({ cursorBlinkRate: 530 }),
+				fullLineSelection({ cursorBlinkRate: 530 }),
 				highlightActiveLine(),
 				highlightActiveLineGutter(),
 				selectionState,

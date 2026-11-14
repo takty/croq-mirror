@@ -84,15 +84,20 @@ try {
 		editorA.querySelector('.cm-activeLineGutter') && selectedLineStyle.boxShadow === 'none' &&
 		getComputedStyle(editorA.querySelector('.cm-syntax-literal')).textShadow !== 'none',
 		'JavaScript selection hides the active-line frame without suppressing standard classes or literal shadows');
-	await waitFor(() => editorA.querySelector('.cm-selectionBackground'), 'selection is rendered');
-	const selectionColor = () => getComputedStyle(editorA.querySelector('.cm-selectionBackground')).backgroundColor;
+	const selectionBackgrounds = () => [...editorA.querySelectorAll('.cm-full-line-selectionLayer .cm-selectionBackground')];
+	await waitFor(() => selectionBackgrounds().length, 'selection is rendered');
+	const selectedLineBox = editorA.querySelector('.cm-line').getBoundingClientRect();
+	const singleLineBox = selectionBackgrounds()[0].getBoundingClientRect();
+	assert(Math.abs(singleLineBox.top - selectedLineBox.top) < 1 && Math.abs(singleLineBox.height - selectedLineBox.height) < 1,
+		'single-line selection fills the entire visual line height');
+	const selectionColor = () => getComputedStyle(selectionBackgrounds()[0]).backgroundColor;
 	await waitFor(() => editorA.classList.contains('cm-focused'), 'editor focus is reflected in the selection style');
 	const focusedSelectionColor = selectionColor();
 	a.blur();
 	await waitFor(() => !editorA.classList.contains('cm-focused'), 'editor blur is reflected in the selection style');
 	assert(selectionColor() === focusedSelectionColor, 'selection background color is the same with and without focus');
 	a.focus();
-	const selectionLayer = editorA.querySelector('.cm-selectionLayer');
+	const selectionLayer = editorA.querySelector('.cm-full-line-selectionLayer');
 	assert(Number(getComputedStyle(selectionLayer).zIndex) > Number(getComputedStyle(editorA.querySelector('.cm-structure-overlay')).zIndex),
 		'selection highlight is painted above the structure canvas and editor background');
 	for (const type of ['copy', 'cut']) {
@@ -101,6 +106,13 @@ try {
 	assert(clipboardEvents.length === 2 && clipboardEvents.every(([, text]) => text === 'function one() { return 1; }'), 'clipboard events expose selection before cutting');
 	offCopy();
 	offCut();
+	a.loadDocument('one\ntwo\nthree');
+	a.focus();
+	press(editorA, 'a', mod);
+	await waitFor(() => selectionBackgrounds().length >= 3, 'multiline selection is rendered');
+	const lineHeight = editorA.querySelector('.cm-line').getBoundingClientRect().height;
+	assert(selectionBackgrounds().every(background => Math.abs(background.getBoundingClientRect().height - lineHeight) < 1),
+		'multiline selection uses the same full visual-line height for every band');
 	a.loadDocument('one\ntwo');
 	const restoredLine = editorA.querySelector('.cm-activeLine');
 	assert(!editorA.classList.contains('cm-has-selection') && restoredLine && editorA.querySelector('.cm-activeLineGutter') &&

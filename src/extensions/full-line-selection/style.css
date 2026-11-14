@@ -1,0 +1,9 @@
+.cm-editor.cm-full-line-selection > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+	display: none;
+}
+
+.cm-editor.cm-full-line-selection > .cm-scroller > .cm-full-line-selectionLayer {
+	z-index: var(--croq-selection-layer-z-index, 2) !important;
+	pointer-events: none;
+	mix-blend-mode: var(--croq-selection-layer-blend-mode, multiply);
+}
