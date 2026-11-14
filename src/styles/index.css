@@ -50,8 +50,14 @@
 .croq-mirror .cm-editor .cm-panels,
 .croq-mirror .cm-editor .cm-tooltip { z-index: 5; }
 
-.croq-mirror .cm-editor .cm-selectionBackground {
+.croq-mirror .cm-editor .cm-selectionBackground,
+.croq-mirror .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
 	background: color-mix(in srgb, var(--croq-mirror-l-aqua-60) 50%, transparent);
+	/* Keep the previous selected color when multiplying over the new default gray. */
+	background: rgb(from var(--croq-mirror-l-aqua-60)
+		calc((r + 253 - 252.76) * 255 / 252.76)
+		calc((g + 253 - 252.76) * 255 / 252.76)
+		calc((b + 249 - 252.76) * 255 / 252.76) / 50%);
 }
 
 .croq-mirror .cm-editor .cm-activeLine { background: transparent; }

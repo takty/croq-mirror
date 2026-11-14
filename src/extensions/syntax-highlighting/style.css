@@ -57,7 +57,7 @@
 .cm-editor.cm-syntax-highlighting .cm-syntax-variable-reference {
 	border-radius: var(--croq-syntax-reference-radius, 0 0.35em 0.35em 0);
 	box-shadow: var(--croq-syntax-reference-shadow, 0 2px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent), 0 -1px 6px color-mix(in srgb, var(--croq-mirror-l-blue, #2e449a) 15%, transparent));
-	background-color: var(--croq-syntax-reference-background, color-mix(in srgb, var(--croq-mirror-color-editor, #fdfdf9) 95%, transparent));
+	background-color: var(--croq-syntax-reference-background, color-mix(in srgb, var(--croq-mirror-color-editor, rgb(252.76 252.76 252.76)) 95%, transparent));
 }
 
 .cm-editor.cm-syntax-highlighting .cm-activeLine .cm-syntax-variable-reference {

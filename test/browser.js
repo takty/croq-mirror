@@ -83,6 +83,13 @@ try {
 		getComputedStyle(editorA.querySelector('.cm-syntax-literal')).textShadow !== 'none',
 		'JavaScript selection hides active-line and gutter highlighting without suppressing literal shadows');
 	await waitFor(() => editorA.querySelector('.cm-selectionBackground'), 'selection is rendered');
+	const selectionColor = () => getComputedStyle(editorA.querySelector('.cm-selectionBackground')).backgroundColor;
+	await waitFor(() => editorA.classList.contains('cm-focused'), 'editor focus is reflected in the selection style');
+	const focusedSelectionColor = selectionColor();
+	a.blur();
+	await waitFor(() => !editorA.classList.contains('cm-focused'), 'editor blur is reflected in the selection style');
+	assert(selectionColor() === focusedSelectionColor, 'selection background color is the same with and without focus');
+	a.focus();
 	const selectionLayer = editorA.querySelector('.cm-selectionLayer');
 	assert(Number(getComputedStyle(selectionLayer).zIndex) > Number(getComputedStyle(editorA.querySelector('.cm-structure-overlay')).zIndex),
 		'selection highlight is painted above the structure canvas and editor background');
@@ -179,11 +186,12 @@ try {
 	a.setSettings({ gutterLineSelection: false });
 	assert(editorA.classList.contains('cm-gutter-line-selection') && !editorA.classList.contains('cm-easy-line-selection'),
 		'legacy option turns off only easy selection');
-	assert(getComputedStyle(editorA).backgroundColor === 'rgb(253, 253, 249)' && getComputedStyle(editorA).color === 'rgb(17, 17, 0)', 'default theme colors preserved');
+	const defaultEditorBackground = 'rgb(253, 253, 253)';
+	assert(getComputedStyle(editorA).backgroundColor === defaultEditorBackground && getComputedStyle(editorA).color === 'rgb(17, 17, 0)', 'default editor background is neutral gray');
 	const themeRoot = editorA.closest('.croq-mirror');
 	themeRoot.style.setProperty('--croq-mirror-color-editor', '#123456');
 	assert(getComputedStyle(editorA).backgroundColor === 'rgb(18, 52, 86)', 'theme custom properties update at runtime');
-	assert(getComputedStyle(editorB).backgroundColor === 'rgb(253, 253, 249)', 'theme custom properties isolated per editor');
+	assert(getComputedStyle(editorB).backgroundColor === defaultEditorBackground, 'theme custom properties isolated per editor');
 	themeRoot.style.removeProperty('--croq-mirror-color-editor');
 	a.loadDocument('function first() {\n\tvar firstValue = 1; console.log(firstValue);\n}\nfunction second() {\n\tvar secondValue = 2;\n}');
 	await a.analyzeNow();
